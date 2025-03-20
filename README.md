@@ -1,2 +1,2 @@
-# Galeria-NFT
+# Peruvian-Cuisine
 # Hola!
