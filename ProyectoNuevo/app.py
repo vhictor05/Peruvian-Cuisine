@@ -2,6 +2,7 @@ import customtkinter as ctk
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from tkinter import messagebox 
+import re
 import customtkinter as ctk
 from crud.ingrediente_crud import IngredienteCRUD
 from crud.cliente_crud import ClienteCRUD
@@ -146,6 +147,16 @@ class ClientePanel(ctk.CTkFrame):
 
         return entry
 
+    def validar_rut(self, rut):
+        return bool(re.match(r"^\d{7,8}-[0-9kK]$", rut))
+
+    def validar_nombre(self, nombre):
+        return bool(re.match(r"^[A-Za-záéíóúÁÉÍÓÚñÑ ]+$", nombre))
+
+    def validar_correo(self, correo):
+        return bool(re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", correo))
+    
+    
     def add_cliente(self):
         rut = self.rut_entry.get()
         email = self.email_entry.get()
@@ -154,19 +165,31 @@ class ClientePanel(ctk.CTkFrame):
         if not nombre or not email or not rut:
             messagebox.showerror("Error", "Todos los campos son obligatorios.")
             return
+        
+        if not self.validar_rut(rut):
+            messagebox.showerror("Error", "El RUT ingresado no es válido. Debe tener el formato XXXXXXXX-Y.")
+            return
+
+        if not self.validar_nombre(nombre):
+            messagebox.showerror("Error", "El nombre solo debe contener letras y espacios.")
+            return
+
+        if not self.validar_correo(email):
+            messagebox.showerror("Error", "El correo electrónico no tiene un formato válido.")
+            return
 
         cliente_existente = ClienteCRUD.get_cliente_by_rut(self.db, rut)
-        if (cliente_existente):
-            messagebox.showinfo("Error", f"El cliente con el rut '{rut}' ya existe.")
+        if cliente_existente:
+            messagebox.showinfo("Error", f"El cliente con el RUT '{rut}' ya existe.")
             return
         else:
             cliente = ClienteCRUD.create_cliente(self.db, rut, nombre, email)
-            if (cliente):
+            if cliente:
                 messagebox.showinfo("Éxito", f"Cliente '{nombre}' registrado con éxito.")
             else:
                 messagebox.showerror("Error", f"No se pudo registrar el cliente '{nombre}'.")
             self.refresh_list()
-
+    
     def open_edit_window(self):
         selected_item = self.cliente_list.selection()
         if not selected_item:
@@ -211,35 +234,52 @@ class ClientePanel(ctk.CTkFrame):
             messagebox.showerror("Error", "Todos los campos son obligatorios para actualizar un cliente.")
             return
 
-        cliente = ClienteCRUD.update_cliente(self.db, rut, nombre, email)
-        if (cliente):
-            messagebox.showinfo("Éxito", f"Cliente n°rut:'{rut}' actualizado a: Nombre:'{nombre}'// Email:'{email}'")
-            self.edit_window.destroy()
-        else:
-            messagebox.showerror("Error", f"No se pudo actualizar el cliente '{nombre}//{rut}'.")
-        self.refresh_list()
-
-    def delete_cliente(self):
-        email_actual = self.get_selected_email()
-        if not email_actual:
-            messagebox.showerror("Error", "Selecciona un cliente de la lista.")
+        if not self.validar_nombre(nombre):
+            messagebox.showerror("Error", "El nombre solo debe contener letras y espacios.")
             return
 
-        confirm = messagebox.askyesno("Confirmar Eliminación", f"¿Estás seguro de eliminar al cliente '{email_actual}'?")
-        if confirm:
-            cliente = ClienteCRUD.delete_cliente(self.db, email_actual)
-            if (cliente):
-                messagebox.showinfo("Éxito", f"Cliente '{email_actual}' eliminado con éxito.")
-            else:
-                messagebox.showerror("Error", f"No se pudo eliminar el cliente '{email_actual}'.")
+        if not self.validar_correo(email):
+            messagebox.showerror("Error", "El correo electrónico no tiene un formato válido.")
+            return
+
+        cliente = ClienteCRUD.update_cliente(self.db, rut, nombre, email)
+        if cliente:
+            messagebox.showinfo("Éxito", f"Cliente con RUT '{rut}' actualizado: Nombre '{nombre}', Email '{email}'.")
+            self.edit_window.destroy()
+        else:
+            messagebox.showerror("Error", f"No se pudo actualizar el cliente '{nombre}'.")
         self.refresh_list()
+    
+    def delete_cliente(self):
+        selected_item = self.cliente_list.selection()
+        if not selected_item:
+            messagebox.showerror("Error", "Selecciona un cliente para eliminar.")
+            return
+
+        # Asegurar que se obtiene el RUT correctamente
+        values = self.cliente_list.item(selected_item)["values"]
+        if not values:
+            messagebox.showerror("Error", "No se pudo obtener la información del cliente.")
+            return
+
+        cliente_rut = values[0]  # Asegurar que estamos obteniendo el RUT y no el email
+
+        confirmacion = messagebox.askyesno("Confirmar eliminación", f"¿Estás seguro de que deseas eliminar al cliente con RUT {cliente_rut}?")
+        if confirmacion:
+            eliminado = ClienteCRUD.delete_cliente(self.db, cliente_rut)  # Asegurar que ClienteCRUD busca por RUT
+            if eliminado:
+                messagebox.showinfo("Éxito", "Cliente eliminado correctamente.")
+                self.refresh_list()
+            else:
+                messagebox.showerror("Error", f"No se pudo eliminar el cliente con RUT {cliente_rut}.")
+
 
     def refresh_list(self):
         for item in self.cliente_list.get_children():
             self.cliente_list.delete(item)
         clientes = ClienteCRUD.get_clientes(self.db)
         for cliente in clientes:
-            self.cliente_list.insert("", "end", values=(cliente.rut, cliente.email, cliente.nombre))  # Asegúrate de incluir el rut
+            self.cliente_list.insert("", "end", values=(cliente.rut, cliente.email, cliente.nombre))  # RUT debe ser el primer valor
 
     def get_selected_email(self):
         selected_item = self.cliente_list.selection()

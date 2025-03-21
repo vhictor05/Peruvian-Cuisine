@@ -59,18 +59,12 @@ class ClienteCRUD:
             return None
 
     @staticmethod
-    def delete_cliente(db: Session, cliente_email: str):
-        try:
-            cliente = db.query(Cliente).filter(Cliente.email == cliente_email).first()
-            if cliente:
-                db.delete(cliente)
-                db.commit() #No hay refresh lo actualiza el treeview
-                return cliente
-            
-            logging.warning(f"No se encontró el cliente con el email '{cliente_email}'.")
-            return None
-
-        except SQLAlchemyError as e:
-            db.rollback()
-            logging.error(f"Error al eliminar cliente: {e}")
-            return None
+    def delete_cliente(db, rut):
+        cliente = db.query(Cliente).filter_by(rut=rut).first()
+        if cliente:
+            db.delete(cliente)
+            db.commit()
+            return True
+        else:
+            logging.warning(f"No se encontró el cliente con el RUT '{rut}'.")  # Antes decía "email", corregido a "RUT"
+            return False
