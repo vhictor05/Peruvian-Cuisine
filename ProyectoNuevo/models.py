@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, JSON
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, JSON, Boolean 
 from sqlalchemy.orm import relationship
 from database import Base
+from hotel_database import Base
 
 class Cliente(Base):
     __tablename__ = "clientes"
@@ -45,3 +46,32 @@ class Pedido(Base):
     cliente_rut = Column(String, ForeignKey('clientes.rut', onupdate="CASCADE"), nullable=False)
     cliente = relationship("Cliente", back_populates="pedidos")
     menus = Column(JSON, nullable=False)  # List to store selected menus
+
+# MODELOS HOTEL
+class Habitacion(Base):
+    __tablename__ = 'habitaciones'
+    id = Column(Integer, primary_key=True)
+    numero = Column(String(10), unique=True, nullable=False)
+    tipo = Column(String(50), nullable=False)
+    precio = Column(Float, nullable=False)
+    disponible = Column(Boolean, default=True)  
+
+class Huesped(Base):
+    __tablename__ = 'huespedes'
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(100), nullable=False)
+    rut = Column(String(12), unique=True, nullable=False)
+    email = Column(String(100))
+    telefono = Column(String(20))
+
+class Reserva(Base):
+    __tablename__ = 'reservas'
+    id = Column(Integer, primary_key=True)
+    fecha_entrada = Column(DateTime, nullable=False)
+    fecha_salida = Column(DateTime, nullable=False)
+    huesped_id = Column(Integer, ForeignKey('huespedes.id'))
+    habitacion_id = Column(Integer, ForeignKey('habitaciones.id'))
+    estado = Column(String(20), default='Pendiente')
+    
+    huesped = relationship("Huesped")
+    habitacion = relationship("Habitacion")
