@@ -21,7 +21,7 @@ class ModuleLauncherApp(ctk.CTk):
 
         # Botones
         self.create_module_button("Restaurant", "restaurant.py", 1)
-        self.create_module_button("Casino", "casino.py", 2)
+        self.create_module_button("Disco", "disco.py", 2)
         self.create_module_button("Hotel", "hotel.py", 3)
 
     def create_module_button(self, text, module_file, row):
