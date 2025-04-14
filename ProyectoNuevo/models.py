@@ -2,6 +2,8 @@ from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Tex
 from sqlalchemy.orm import relationship
 from database import Base
 from hotel_database import Base
+from disco_database import Base
+
 
 class Cliente(Base):
     __tablename__ = "clientes"
@@ -75,3 +77,63 @@ class Reserva(Base):
     
     huesped = relationship("Huesped")
     habitacion = relationship("Habitacion")
+
+
+# MODELO DISCO
+
+class Evento(Base):
+    __tablename__ = 'eventos'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nombre = Column(String(100), nullable=False)
+    descripcion = Column(Text)
+    fecha = Column(DateTime, nullable=False)
+    precio_entrada = Column(Float, nullable=False)
+    aforo_maximo = Column(Integer, nullable=False)
+
+    entradas = relationship("Entrada", back_populates="evento")
+    reservas_mesa = relationship("ReservaMesa", back_populates="evento")
+
+class ClienteDiscoteca(Base):
+    __tablename__ = 'clientes_discoteca'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nombre = Column(String(100), nullable=False)
+    rut = Column(String(12), unique=True, nullable=False)
+    email = Column(String(100))
+    telefono = Column(String(20))
+
+    entradas = relationship("Entrada", back_populates="cliente")
+    reservas_mesa = relationship("ReservaMesa", back_populates="cliente")
+
+class Entrada(Base):
+    __tablename__ = 'entradas'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    evento_id = Column(Integer, ForeignKey('eventos.id'), nullable=False)
+    cliente_id = Column(Integer, ForeignKey('clientes_discoteca.id'), nullable=False)
+    fecha_compra = Column(DateTime, nullable=False)
+    precio_pagado = Column(Float, nullable=False)
+
+    evento = relationship("Evento", back_populates="entradas")
+    cliente = relationship("ClienteDiscoteca", back_populates="entradas")
+
+class Mesa(Base):
+    __tablename__ = 'mesas'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    numero = Column(String(10), unique=True, nullable=False)
+    capacidad = Column(Integer, nullable=False)
+    ubicacion = Column(String(100))
+
+    reservas = relationship("ReservaMesa", back_populates="mesa")
+
+class ReservaMesa(Base):
+    __tablename__ = 'reservas_mesa'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    evento_id = Column(Integer, ForeignKey('eventos.id'), nullable=False)
+    cliente_id = Column(Integer, ForeignKey('clientes_discoteca.id'), nullable=False)
+    mesa_id = Column(Integer, ForeignKey('mesas.id'), nullable=False)
+    fecha_reserva = Column(DateTime, nullable=False)
+    estado = Column(String(20), default="Pendiente")  # Confirmada, Cancelada, etc.
+
+    evento = relationship("Evento", back_populates="reservas_mesa")
+    cliente = relationship("ClienteDiscoteca", back_populates="reservas_mesa")
+    mesa = relationship("Mesa", back_populates="reservas")
+ 
