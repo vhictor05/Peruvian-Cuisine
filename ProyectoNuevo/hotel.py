@@ -96,15 +96,30 @@ class HotelApp(ctk.CTk):
         form_frame = ctk.CTkFrame(self.main_frame)
         form_frame.pack(fill="x", padx=20, pady=10)
         
-        self.habitacion_numero = self.create_form_entry(form_frame, "Número", 0)
-        self.habitacion_tipo = self.create_form_entry(form_frame, "Tipo", 1)
-        self.habitacion_precio = self.create_form_entry(form_frame, "Precio", 2)
+        # Campo "Número"
+        ctk.CTkLabel(form_frame, text="Número:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        self.habitacion_numero = ctk.CTkEntry(form_frame)
+        self.habitacion_numero.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        
+        # Campo "Tipo"
+        ctk.CTkLabel(form_frame, text="Tipo:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        self.habitacion_tipo = ctk.CTkComboBox(
+            form_frame, 
+            values=["VIP", "Penthouse", "Grande", "Mediana", "Pequeña"]
+        )
+        self.habitacion_tipo.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        
+        # Campo "Precio"
+        ctk.CTkLabel(form_frame, text="Precio:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        self.habitacion_precio = ctk.CTkEntry(form_frame)
+        self.habitacion_precio.grid(row=2, column=1, padx=5, pady=5, sticky="w")
         
         # Botones
         btn_frame = ctk.CTkFrame(self.main_frame)
         btn_frame.pack(pady=10)
         
         ctk.CTkButton(btn_frame, text="Registrar", command=self.registrar_habitacion).pack(side="left", padx=5)
+        ctk.CTkButton(btn_frame, text="Modificar", command=self.modificar_habitacion).pack(side="left", padx=5)
         
         # Lista de habitaciones
         columns = ["ID", "Número", "Tipo", "Precio", "Disponible"]
@@ -118,47 +133,51 @@ class HotelApp(ctk.CTk):
     # ===== PANEL RESERVAS =====
     def show_reservas(self):
         self.clear_main_frame()
-    
+
         # Título
         ctk.CTkLabel(self.main_frame, text="Gestión de Reservas", font=("Arial", 20)).pack(pady=10)
-        
+
         # Formulario
         form_frame = ctk.CTkFrame(self.main_frame)
         form_frame.pack(fill="x", padx=20, pady=10)
-        
+
         # Combobox para huéspedes
         ctk.CTkLabel(form_frame, text="Huésped:").grid(row=0, column=0, padx=5, pady=5)
         self.reserva_huesped = ctk.CTkComboBox(form_frame, values=self.obtener_huespedes_combobox())
         self.reserva_huesped.grid(row=0, column=1, padx=5, pady=5)
-        
-        # Combobox para habitaciones disponibles
-        ctk.CTkLabel(form_frame, text="Habitación:").grid(row=1, column=0, padx=5, pady=5)
-        self.reserva_habitacion = ctk.CTkComboBox(form_frame, values=self.obtener_habitaciones_disponibles_combobox())
-        self.reserva_habitacion.grid(row=1, column=1, padx=5, pady=5)
-        
+
+        # Selección de tipo de habitación
+        ctk.CTkLabel(form_frame, text="Tipo de Habitación:").grid(row=1, column=0, padx=5, pady=5)
+        self.reserva_habitacion_tipo = ctk.CTkComboBox(
+            form_frame,
+            values=["VIP", "Penthouse", "Grande", "Mediana", "Pequeña"]
+        )
+        self.reserva_habitacion_tipo.grid(row=1, column=1, padx=5, pady=5)
+
         # Fechas
         ctk.CTkLabel(form_frame, text="Fecha Entrada:").grid(row=2, column=0, padx=5, pady=5)
         self.reserva_fecha_entrada = ctk.CTkEntry(form_frame)
         self.reserva_fecha_entrada.grid(row=2, column=1, padx=5, pady=5)
         self.reserva_fecha_entrada.insert(0, datetime.now().strftime("%Y-%m-%d"))
-        
+
         ctk.CTkLabel(form_frame, text="Fecha Salida:").grid(row=3, column=0, padx=5, pady=5)
         self.reserva_fecha_salida = ctk.CTkEntry(form_frame)
         self.reserva_fecha_salida.grid(row=3, column=1, padx=5, pady=5)
         self.reserva_fecha_salida.insert(0, (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"))
-        
+
         # Botón de reserva
         btn_frame = ctk.CTkFrame(self.main_frame)
         btn_frame.pack(pady=10)
-        
+
         ctk.CTkButton(btn_frame, text="Crear Reserva", command=self.crear_reserva).pack(side="left", padx=5)
-        
+        ctk.CTkButton(btn_frame, text="Eliminar Reserva", command=self.eliminar_reserva).pack(side="left", padx=5)
+
         # Lista de reservas
         columns = ["ID", "Huésped", "Habitación", "Entrada", "Salida", "Estado"]
         self.reserva_tree = ttk.Treeview(self.main_frame, columns=columns, show="headings")
         for col in columns:
             self.reserva_tree.heading(col, text=col)
-        
+
         self.reserva_tree.pack(fill="both", expand=True, padx=20, pady=10)
         self.actualizar_lista_reservas()
     
@@ -171,6 +190,9 @@ class HotelApp(ctk.CTk):
         return [f"{h.numero} - {h.tipo}" for h in habitaciones]
 
     def actualizar_lista_reservas(self):
+        if not hasattr(self, 'reserva_tree') or not self.reserva_tree.winfo_exists():
+            return  # Evita errores si el TreeView no existe
+
         for item in self.reserva_tree.get_children():
             self.reserva_tree.delete(item)
             
@@ -187,18 +209,35 @@ class HotelApp(ctk.CTk):
 
     def crear_reserva(self):
         try:
+            # Asegúrate de que el panel de reservas esté activo
+            self.show_reservas()
+
             # Obtener IDs de los combobox
             huesped_rut = self.reserva_huesped.get().split("(")[-1].rstrip(")")
-            habitacion_num = self.reserva_habitacion.get().split(" - ")[0]
+            habitacion_tipo = self.reserva_habitacion_tipo.get()
             
+            # Buscar el huésped
             huesped = self.db.query(Huesped).filter(Huesped.rut == huesped_rut).first()
-            habitacion = self.db.query(Habitacion).filter(Habitacion.numero == habitacion_num).first()
+            if not huesped:
+                raise ValueError("El huésped no existe")
             
-            self.reserva_fecha_entrada = DateEntry(form_frame, date_pattern="yyyy-mm-dd")
-            self.reserva_fecha_salida = DateEntry(form_frame, date_pattern="yyyy-mm-dd")
-
-
+            # Obtener las fechas
+            fecha_entrada = datetime.strptime(self.reserva_fecha_entrada.get(), "%Y-%m-%d")
+            fecha_salida = datetime.strptime(self.reserva_fecha_salida.get(), "%Y-%m-%d")
             
+            if fecha_entrada >= fecha_salida:
+                raise ValueError("La fecha de salida debe ser posterior a la fecha de entrada")
+            
+            # Buscar una habitación disponible del tipo seleccionado
+            habitacion = self.db.query(Habitacion).filter(
+                Habitacion.tipo == habitacion_tipo,
+                Habitacion.disponible == True
+            ).first()
+            
+            if not habitacion:
+                raise ValueError("No hay habitaciones disponibles de este tipo")
+            
+            # Crear la reserva
             ReservaCRUD.crear_reserva(
                 self.db,
                 huesped_id=huesped.id,
@@ -207,12 +246,38 @@ class HotelApp(ctk.CTk):
                 fecha_salida=fecha_salida
             )
             
+            # Actualizar disponibilidad de la habitación
+            habitacion.disponible = False
+            self.db.commit()
+            
             messagebox.showinfo("Éxito", "Reserva creada correctamente")
             self.actualizar_lista_reservas()
+            self.actualizar_lista_habitaciones()
             
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo crear la reserva: {str(e)}")
 
+    def eliminar_reserva(self):
+        # Obtener la reserva seleccionada en el TreeView
+        selected_item = self.reserva_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione una reserva para eliminar")
+            return
+
+        # Obtener el ID de la reserva seleccionada
+        reserva_id = self.reserva_tree.item(selected_item, "values")[0]
+
+        # Confirmar eliminación
+        confirm = messagebox.askyesno("Confirmar", "¿Está seguro de que desea eliminar esta reserva?")
+        if not confirm:
+            return
+
+        try:
+            ReservaCRUD.eliminar_reserva(self.db, reserva_id=int(reserva_id))
+            messagebox.showinfo("Éxito", "Reserva eliminada correctamente")
+            self.actualizar_lista_reservas()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo eliminar la reserva: {str(e)}")
 
     # ===== MÉTODOS AUXILIARES =====
     def create_form_entry(self, parent, label, row):
@@ -313,9 +378,46 @@ class HotelApp(ctk.CTk):
             messagebox.showinfo("Éxito", "Habitación registrada")
             self.actualizar_lista_habitaciones()
         except ValueError:
-            messagebox.showerror("Error", "Precio debe ser un número")
+            messagebox.showerror("Error", "Precio debe ser un número válido")
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo registrar la habitación: {str(e)}")
+
+    def modificar_habitacion(self):
+        # Obtener la habitación seleccionada en el TreeView
+        selected_item = self.habitacion_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione una habitación para modificar")
+            return
+
+        # Obtener los valores de la habitación seleccionada
+        habitacion_id = self.habitacion_tree.item(selected_item, "values")[0]
+
+        # Obtener los nuevos valores del formulario
+        numero = self.habitacion_numero.get()
+        tipo = self.habitacion_tipo.get()
+        precio = self.habitacion_precio.get()
+        disponible = messagebox.askyesno("Disponibilidad", "¿Está disponible esta habitación?")
+
+        if not all([numero, tipo, precio]):
+            messagebox.showerror("Error", "Todos los campos son obligatorios")
+            return
+
+        try:
+            precio = float(precio)
+            HabitacionCRUD.modificar_habitacion(
+                self.db,
+                habitacion_id=habitacion_id,
+                numero=numero,
+                tipo=tipo,
+                precio=precio,
+                disponible=disponible
+            )
+            messagebox.showinfo("Éxito", "Habitación modificada correctamente")
+            self.actualizar_lista_habitaciones()
+        except ValueError:
+            messagebox.showerror("Error", "Precio debe ser un número válido")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo modificar la habitación: {str(e)}")
 
 if __name__ == "__main__":
     app = HotelApp()

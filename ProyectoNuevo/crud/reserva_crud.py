@@ -49,3 +49,14 @@ class ReservaCRUD:
             Reserva.fecha_salida >= hoy,
             Reserva.estado == "Confirmada"
         ).all()
+
+    @staticmethod
+    def eliminar_reserva(db: Session, reserva_id: int):
+        # Buscar la reserva por ID
+        reserva = db.query(Reserva).filter(Reserva.id == reserva_id).first()
+        if not reserva:
+            raise ValueError("La reserva no existe")
+        
+        # Eliminar la reserva
+        db.delete(reserva)
+        db.commit()

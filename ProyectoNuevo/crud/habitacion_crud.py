@@ -24,3 +24,16 @@ class HabitacionCRUD:
             habitacion.disponible = disponible
             db.commit()
         return habitacion
+
+    @staticmethod
+    def modificar_habitacion(db: Session, habitacion_id: int, numero: str, tipo: str, precio: float, disponible: bool):
+        habitacion = db.query(Habitacion).filter(Habitacion.id == habitacion_id).first()
+        if not habitacion:
+            raise Exception("Habitación no encontrada")
+        
+        habitacion.numero = numero
+        habitacion.tipo = tipo
+        habitacion.precio = precio
+        habitacion.disponible = disponible
+        db.commit()
+        return habitacion
