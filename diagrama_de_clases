@@ -1,0 +1,160 @@
+@startuml
+' ==== SISTEMA PRINCIPAL ====
+class SistemaPrincipal {
+  +casino: Casino
+  +hotel: Hotel
+  +restaurante: Restaurante
+  +elegir_servicio(tipo: str)
+}
+
+' ==== CASINO ====
+class Evento {
+  +id: int
+  +nombre: str
+  +descripcion: str
+  +fecha: datetime
+  +precio_entrada: float
+  +aforo_maximo: int
+}
+
+class ClienteDiscoteca {
+  +id: int
+  +nombre: str
+  +rut: str
+  +email: str
+  +telefono: str
+}
+
+class Entrada {
+  +id: int
+  +cliente_id: int
+  +evento_id: int
+}
+
+class Mesa {
+  +id: int
+  +numero: int
+  +capacidad: int
+  +disponible: bool
+}
+
+class ReservaMesa {
+  +id: int
+  +cliente_id: int
+  +mesa_id: int
+  +fecha: datetime
+}
+
+class Casino {
+  +eventos: List<Evento>
+  +clientes: List<ClienteDiscoteca>
+  +mesas: List<Mesa>
+  +reservas: List<ReservaMesa>
+}
+
+' ==== HOTEL ====
+class Huesped {
+  +id: int
+  +nombre: str
+  +rut: str
+  +email: str
+  +telefono: str
+}
+
+class Habitacion {
+  +id: int
+  +numero: str
+  +tipo: str
+  +precio: float
+  +disponible: bool
+}
+
+class Reserva {
+  +id: int
+  +huesped_id: int
+  +habitacion_id: int
+  +fecha_entrada: date
+  +fecha_salida: date
+  +estado: str
+}
+
+class Hotel {
+  +huespedes: List<Huesped>
+  +habitaciones: List<Habitacion>
+  +reservas: List<Reserva>
+}
+
+
+' ==== RESTAURANTE ====
+class Cliente {
+  +rut: str
+  +nombre: str
+  +email: str
+}
+
+class Ingrediente {
+  +id: int
+  +nombre: str
+  +tipo: str
+  +cantidad: float
+  +unidad: str
+}
+
+class Menu {
+  +id: int
+  +nombre: str
+  +descripcion: str
+  +precio: float
+}
+
+class MenuIngrediente {
+  +menu_id: int
+  +ingrediente_id: int
+  +cantidad: float
+}
+
+class Pedido {
+  +id: int
+  +cliente_rut: str
+  +descripcion: str
+  +total: float
+  +fecha: datetime
+}
+
+class Restaurante {
+  +clientes: List<Cliente>
+  +ingredientes: List<Ingrediente>
+  +menus: List<Menu>
+  +pedidos: List<Pedido>
+}
+
+' ==== RELACIONES SISTEMA PRINCIPAL (AGREGACIÓN) ====
+SistemaPrincipal o-- Casino
+SistemaPrincipal o-- Hotel
+SistemaPrincipal o-- Restaurante
+
+' ==== RELACIONES CASINO (COMPOSICIÓN + ASOCIACIONES) ====
+Casino o-- Evento
+Casino *-- ReservaMesa
+Entrada "*" --* "1" Evento
+ReservaMesa "*" --* "1" ClienteDiscoteca
+ReservaMesa "*" --* "1" Mesa
+
+' ==== RELACIONES HOTEL (COMPOSICIÓN + ASOCIACIONES) ====
+Hotel *-- Reserva
+Reserva "*" *-- "1" Huesped
+Reserva "*" --* "1" Habitacion
+
+' ==== RELACIONES RESTAURANTE (COMPOSICIÓN + ASOCIACIONES) ====
+
+Restaurante *-- Ingrediente
+Restaurante *-- Pedido
+
+MenuIngrediente "*" --* "*" Ingrediente
+MenuIngrediente "*" --* "*" Menu
+Pedido "*" --* "1" Cliente
+Pedido "*" --* "*" Menu
+
+@enduml
+
+#entrar a https://www.plantuml.com/plantuml/uml/  ejecutar codigo en caso de querer modificar diagrama.
