@@ -6,6 +6,9 @@ from hotel_database import get_db, Base
 from models import Huesped, Habitacion, Reserva
 from crud.huesped_crud import HuespedCRUD
 from crud.habitacion_crud import HabitacionCRUD
+from crud.reserva_crud import ReservaCRUD
+from datetime import datetime, timedelta
+from tkcalendar import DateEntry
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -115,15 +118,101 @@ class HotelApp(ctk.CTk):
     # ===== PANEL RESERVAS =====
     def show_reservas(self):
         self.clear_main_frame()
-        
+    
         # Título
         ctk.CTkLabel(self.main_frame, text="Gestión de Reservas", font=("Arial", 20)).pack(pady=10)
         
-        # Formulario básico (implementación completa requeriría más desarrollo)
+        # Formulario
         form_frame = ctk.CTkFrame(self.main_frame)
         form_frame.pack(fill="x", padx=20, pady=10)
         
-        ctk.CTkLabel(form_frame, text="Funcionalidad en desarrollo", font=("Arial", 16)).pack(pady=50)
+        # Combobox para huéspedes
+        ctk.CTkLabel(form_frame, text="Huésped:").grid(row=0, column=0, padx=5, pady=5)
+        self.reserva_huesped = ctk.CTkComboBox(form_frame, values=self.obtener_huespedes_combobox())
+        self.reserva_huesped.grid(row=0, column=1, padx=5, pady=5)
+        
+        # Combobox para habitaciones disponibles
+        ctk.CTkLabel(form_frame, text="Habitación:").grid(row=1, column=0, padx=5, pady=5)
+        self.reserva_habitacion = ctk.CTkComboBox(form_frame, values=self.obtener_habitaciones_disponibles_combobox())
+        self.reserva_habitacion.grid(row=1, column=1, padx=5, pady=5)
+        
+        # Fechas
+        ctk.CTkLabel(form_frame, text="Fecha Entrada:").grid(row=2, column=0, padx=5, pady=5)
+        self.reserva_fecha_entrada = ctk.CTkEntry(form_frame)
+        self.reserva_fecha_entrada.grid(row=2, column=1, padx=5, pady=5)
+        self.reserva_fecha_entrada.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        
+        ctk.CTkLabel(form_frame, text="Fecha Salida:").grid(row=3, column=0, padx=5, pady=5)
+        self.reserva_fecha_salida = ctk.CTkEntry(form_frame)
+        self.reserva_fecha_salida.grid(row=3, column=1, padx=5, pady=5)
+        self.reserva_fecha_salida.insert(0, (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"))
+        
+        # Botón de reserva
+        btn_frame = ctk.CTkFrame(self.main_frame)
+        btn_frame.pack(pady=10)
+        
+        ctk.CTkButton(btn_frame, text="Crear Reserva", command=self.crear_reserva).pack(side="left", padx=5)
+        
+        # Lista de reservas
+        columns = ["ID", "Huésped", "Habitación", "Entrada", "Salida", "Estado"]
+        self.reserva_tree = ttk.Treeview(self.main_frame, columns=columns, show="headings")
+        for col in columns:
+            self.reserva_tree.heading(col, text=col)
+        
+        self.reserva_tree.pack(fill="both", expand=True, padx=20, pady=10)
+        self.actualizar_lista_reservas()
+    
+    def obtener_huespedes_combobox(self):
+        huespedes = self.db.query(Huesped).all()
+        return [f"{h.nombre} ({h.rut})" for h in huespedes]
+
+    def obtener_habitaciones_disponibles_combobox(self):
+        habitaciones = self.db.query(Habitacion).filter(Habitacion.disponible == True).all()
+        return [f"{h.numero} - {h.tipo}" for h in habitaciones]
+
+    def actualizar_lista_reservas(self):
+        for item in self.reserva_tree.get_children():
+            self.reserva_tree.delete(item)
+            
+        reservas = self.db.query(Reserva).all()
+        for res in reservas:
+            self.reserva_tree.insert("", "end", values=(
+                res.id,
+                res.huesped.nombre,
+                res.habitacion.numero,
+                res.fecha_entrada.strftime("%Y-%m-%d"),
+                res.fecha_salida.strftime("%Y-%m-%d"),
+                res.estado
+            ))
+
+    def crear_reserva(self):
+        try:
+            # Obtener IDs de los combobox
+            huesped_rut = self.reserva_huesped.get().split("(")[-1].rstrip(")")
+            habitacion_num = self.reserva_habitacion.get().split(" - ")[0]
+            
+            huesped = self.db.query(Huesped).filter(Huesped.rut == huesped_rut).first()
+            habitacion = self.db.query(Habitacion).filter(Habitacion.numero == habitacion_num).first()
+            
+            self.reserva_fecha_entrada = DateEntry(form_frame, date_pattern="yyyy-mm-dd")
+            self.reserva_fecha_salida = DateEntry(form_frame, date_pattern="yyyy-mm-dd")
+
+
+            
+            ReservaCRUD.crear_reserva(
+                self.db,
+                huesped_id=huesped.id,
+                habitacion_id=habitacion.id,
+                fecha_entrada=fecha_entrada,
+                fecha_salida=fecha_salida
+            )
+            
+            messagebox.showinfo("Éxito", "Reserva creada correctamente")
+            self.actualizar_lista_reservas()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo crear la reserva: {str(e)}")
+
 
     # ===== MÉTODOS AUXILIARES =====
     def create_form_entry(self, parent, label, row):
