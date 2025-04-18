@@ -1,11 +1,17 @@
 import customtkinter as ctk
 from tkinter import messagebox, ttk
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from disco_database import get_db, engine, Base
-from models import Evento, ClienteDiscoteca, Entrada, Mesa, ReservaMesa
+from models import Evento, ClienteDiscoteca, Entrada, Mesa, ReservaMesa, Trago, PedidoTrago
 from crud.evento_crud import EventoCRUD
 from crud.cliente_disco_crud import ClienteDiscotecaCRUD
+from tkcalendar import Calendar, DateEntry
+import tkinter as tk
+from fpdf import FPDF
+from crud.trago_crud import TragoCRUD
+
+
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
@@ -30,7 +36,8 @@ class DiscotecaApp(ctk.CTk):
 
         self.create_menu_button("Eventos", self.show_eventos)
         self.create_menu_button("Clientes", self.show_clientes)
-
+        self.create_menu_button("Tragos", self.show_tragos)
+        
         self.show_eventos()
 
     def on_closing(self):
@@ -59,12 +66,64 @@ class DiscotecaApp(ctk.CTk):
     def show_eventos(self):
         self.clear_main_frame()
         ctk.CTkLabel(self.main_frame, text="Gestión de Eventos", font=("Arial", 20)).pack(pady=10)
+        
         form_frame = ctk.CTkFrame(self.main_frame)
         form_frame.pack(fill="x", padx=20, pady=10)
 
+        # Campos existentes
         self.evento_nombre = self.create_form_entry(form_frame, "Nombre", 0)
         self.evento_descripcion = self.create_form_entry(form_frame, "Descripción", 1)
-        self.evento_fecha = self.create_form_entry(form_frame, "Fecha (YYYY-MM-DD HH:MM)", 2)
+        
+        # Nuevo selector de fecha y hora
+        fecha_frame = ctk.CTkFrame(form_frame)
+        fecha_frame.grid(row=2, column=0, sticky="ew", pady=5)
+        
+        ctk.CTkLabel(fecha_frame, text="Fecha:").pack(side="left", padx=5)
+        
+        # Frame para fecha y hora
+        datetime_frame = ctk.CTkFrame(fecha_frame)
+        datetime_frame.pack(side="right", fill="x", expand=True)
+        
+        # Selector de fecha
+        self.cal = DateEntry(
+            datetime_frame, 
+            date_pattern="yyyy-mm-dd",
+            width=12,
+            background="darkblue",
+            foreground="white",
+            borderwidth=2
+        )
+        self.cal.pack(side="left", padx=5)
+        
+        # Selector de hora
+        hora_frame = ctk.CTkFrame(datetime_frame)
+        hora_frame.pack(side="left", padx=5)
+        
+        ctk.CTkLabel(hora_frame, text="Hora:").pack(side="left")
+        
+        self.hora_spinbox = ttk.Spinbox(
+            hora_frame,
+            from_=0,
+            to=23,
+            width=2,
+            format="%02.0f"
+        )
+        self.hora_spinbox.pack(side="left", padx=2)
+        self.hora_spinbox.set("20")
+        
+        ctk.CTkLabel(hora_frame, text=":").pack(side="left")
+        
+        self.minuto_spinbox = ttk.Spinbox(
+            hora_frame,
+            from_=0,
+            to=59,
+            width=2,
+            format="%02.0f"
+        )
+        self.minuto_spinbox.pack(side="left", padx=2)
+        self.minuto_spinbox.set("00")
+
+        # Resto de campos
         self.evento_precio = self.create_form_entry(form_frame, "Precio Entrada", 3)
         self.evento_aforo = self.create_form_entry(form_frame, "Aforo Máximo", 4)
 
@@ -73,18 +132,34 @@ class DiscotecaApp(ctk.CTk):
         self.evento_tree = self.create_treeview(["ID", "Nombre", "Fecha", "Precio", "Aforo"])
         self.actualizar_lista_eventos()
 
+
     def registrar_evento(self):
         try:
+            # Obtener fecha y hora de los nuevos controles
+            fecha = self.cal.get_date()
+            hora = int(self.hora_spinbox.get())
+            minuto = int(self.minuto_spinbox.get())
+            
+            fecha_hora = datetime(
+                year=fecha.year,
+                month=fecha.month,
+                day=fecha.day,
+                hour=hora,
+                minute=minuto
+            )
+            
             evento_data = {
                 "nombre": self.evento_nombre.get(),
                 "descripcion": self.evento_descripcion.get(),
-                "fecha": datetime.strptime(self.evento_fecha.get(), "%Y-%m-%d %H:%M"),
+                "fecha": fecha_hora,
                 "precio_entrada": float(self.evento_precio.get()),
                 "aforo_maximo": int(self.evento_aforo.get())
             }
+            
             EventoCRUD.crear(self.db, evento_data)
             messagebox.showinfo("Éxito", "Evento registrado")
             self.actualizar_lista_eventos()
+            
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -136,6 +211,433 @@ class DiscotecaApp(ctk.CTk):
             tree.column(col, width=120)
         tree.pack(fill="both", expand=True, padx=20, pady=10)
         return tree
+    
+
+
+    def show_tragos(self):
+            self.clear_main_frame()
+            
+            # Título
+            ctk.CTkLabel(self.main_frame, text="Gestión de Tragos", font=("Arial", 20)).pack(pady=10)
+            
+            # Pestañas
+            tabview = ctk.CTkTabview(self.main_frame)
+            tabview.pack(fill="both", expand=True, padx=20, pady=10)
+            
+            tabview.add("Registro")
+            tabview.add("Pedidos")
+            
+            # Pestaña de Registro
+            self.setup_tragos_registro_tab(tabview.tab("Registro"))
+            
+            # Pestaña de Pedidos
+            self.setup_tragos_pedidos_tab(tabview.tab("Pedidos"))
+
+    def setup_tragos_registro_tab(self, tab):
+        form_frame = ctk.CTkFrame(tab)
+        form_frame.pack(fill="x", padx=10, pady=10)
+        
+        self.trago_nombre = self.create_form_entry(form_frame, "Nombre", 0)
+        self.trago_descripcion = self.create_form_entry(form_frame, "Descripción", 1)
+        self.trago_precio = self.create_form_entry(form_frame, "Precio", 2)
+        self.trago_categoria = self.create_form_entry(form_frame, "Categoría", 3)
+        
+        ctk.CTkButton(tab, text="Registrar Trago", command=self.registrar_trago).pack(pady=10)
+        
+        # Lista de tragos
+        columns = ["ID", "Nombre", "Descripción", "Precio", "Categoría"]
+        self.trago_tree = ttk.Treeview(tab, columns=columns, show="headings")
+        for col in columns:
+            self.trago_tree.heading(col, text=col)
+            self.trago_tree.column(col, width=120)
+        
+        self.trago_tree.pack(fill="both", expand=True, padx=20, pady=10)
+        self.actualizar_lista_tragos()
+
+    def setup_tragos_pedidos_tab(self, tab):
+        # Frame de instrucciones
+        instrucciones_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        instrucciones_frame.pack(fill="x", padx=10, pady=(5, 10))
+        
+        ctk.CTkLabel(
+            instrucciones_frame, 
+            text="① Seleccione cliente → ② Añada tragos → ③ Confirme pedido",
+            font=("Arial", 11, "bold"),
+            text_color="#3a7ebf"
+        ).pack()
+
+        # Frame superior para selección de cliente con búsqueda
+        cliente_frame = ctk.CTkFrame(tab)
+        cliente_frame.pack(fill="x", padx=10, pady=(0, 10))
+
+        # Búsqueda de cliente
+        ctk.CTkLabel(cliente_frame, text="Buscar Cliente:").grid(row=0, column=0, padx=5, pady=5)
+        self.busqueda_cliente = ctk.CTkEntry(cliente_frame)
+        self.busqueda_cliente.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.busqueda_cliente.bind("<KeyRelease>", self.filtrar_clientes)
+
+        # Combobox de clientes filtrados
+        self.lista_clientes = ctk.CTkComboBox(cliente_frame, state="readonly")
+        self.lista_clientes.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+        self.actualizar_lista_clientes_combo()
+
+        # Panel de info del cliente seleccionado
+        self.cliente_info_frame = ctk.CTkFrame(tab, fg_color="#2b2b2b")
+        self.cliente_info_frame.pack(fill="x", padx=10, pady=(0, 15))
+        self.cliente_seleccionado_label = ctk.CTkLabel(
+            self.cliente_info_frame, 
+            text="Ningún cliente seleccionado",
+            font=("Arial", 12)
+        )
+        self.cliente_seleccionado_label.pack(pady=5)
+
+        # Frame para agregar tragos
+        tragos_frame = ctk.CTkFrame(tab)
+        tragos_frame.pack(fill="x", padx=10, pady=10)
+
+        # Búsqueda de tragos
+        ctk.CTkLabel(tragos_frame, text="Buscar Trago:").grid(row=0, column=0, padx=5, pady=5)
+        self.busqueda_trago = ctk.CTkEntry(tragos_frame)
+        self.busqueda_trago.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.busqueda_trago.bind("<KeyRelease>", self.filtrar_tragos)
+
+        # Combobox de tragos filtrados
+        self.lista_tragos = ctk.CTkComboBox(tragos_frame, state="readonly")
+        self.lista_tragos.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+        self.actualizar_lista_tragos_combo()
+
+        # Cantidad
+        ctk.CTkLabel(tragos_frame, text="Cantidad:").grid(row=1, column=1, padx=5, pady=5)
+        self.trago_cantidad = ctk.CTkEntry(tragos_frame, width=60)
+        self.trago_cantidad.grid(row=1, column=2, padx=5, pady=5)
+        self.trago_cantidad.insert(0, "1")
+
+        # Botón para agregar
+        agregar_btn = ctk.CTkButton(
+            tragos_frame, 
+            text="➕ Agregar",
+            command=self.agregar_trago_pedido,
+            width=80,
+            fg_color="#2e8b57",
+            hover_color="#3cb371"
+        )
+        agregar_btn.grid(row=1, column=3, padx=5, pady=5)
+
+        # Lista de pedidos actuales
+        columns = ["Trago", "Cantidad", "Precio Unitario", "Subtotal", "✖"]
+        self.pedido_tree = ttk.Treeview(
+            tab,
+            columns=columns,
+            show="headings",
+            height=8,
+            selectmode="browse"
+        )
+        
+        # Configurar columnas
+        col_widths = [150, 80, 120, 100, 40]
+        for col, width in zip(columns, col_widths):
+            self.pedido_tree.heading(col, text=col)
+            self.pedido_tree.column(col, width=width, anchor="center")
+        
+        # Estilo para el Treeview
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Treeview", 
+            background="#2a2d2e",
+            foreground="white",
+            fieldbackground="#2a2d2e",
+            bordercolor="#3b3b3b",
+            borderwidth=0
+        )
+        style.map('Treeview', background=[('selected', '#3a7ebf')])
+        
+        self.pedido_tree.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+
+        # Frame inferior con total y botón
+        bottom_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        bottom_frame.pack(fill="x", padx=20, pady=(0, 10))
+
+        self.pedido_total = ctk.CTkLabel(
+            bottom_frame, 
+            text="Total: $0.00", 
+            font=("Arial", 14, "bold"),
+            text_color="#f0f0f0"
+        )
+        self.pedido_total.pack(side="left", padx=10)
+
+        confirmar_btn = ctk.CTkButton(
+            bottom_frame,
+            text="✅ Confirmar Pedido",
+            command=self.confirmar_pedido_tragos,
+            fg_color="#3a7ebf",
+            hover_color="#4d90fe"
+        )
+        confirmar_btn.pack(side="right")
+
+    def registrar_trago(self):
+        try:
+            trago_data = {
+                "nombre": self.trago_nombre.get(),
+                "descripcion": self.trago_descripcion.get(),
+                "precio": float(self.trago_precio.get()),
+                "categoria": self.trago_categoria.get() or None
+            }
+            
+            TragoCRUD.crear_trago(self.db, **trago_data)
+            messagebox.showinfo("Éxito", "Trago registrado correctamente")
+            self.actualizar_lista_tragos()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def actualizar_lista_tragos(self):
+        for item in self.trago_tree.get_children():
+            self.trago_tree.delete(item)
+            
+        tragos = TragoCRUD.obtener_todos(self.db)
+        for trago in tragos:
+            self.trago_tree.insert("", "end", values=(
+                trago.id,
+                trago.nombre,
+                trago.descripcion or "",
+                f"${trago.precio:.2f}",
+                trago.categoria or ""
+            ))
+
+    def obtener_tragos_combobox(self):
+        tragos = TragoCRUD.obtener_todos(self.db)
+        return [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
+
+    def agregar_trago_pedido(self):
+        try:
+            trago_str = self.lista_tragos.get()
+            cantidad = int(self.trago_cantidad.get())
+            
+            if not trago_str or cantidad <= 0:
+                messagebox.showwarning("Advertencia", "Seleccione un trago y cantidad válida")
+                return
+            
+            # Extraer nombre del trago
+            trago_nombre = trago_str.split(" ($")[0]
+            trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+            
+            if not trago:
+                messagebox.showerror("Error", "Trago no encontrado")
+                return
+            
+            subtotal = trago.precio * cantidad
+            
+            # Insertar con botón de eliminar
+            item_id = self.pedido_tree.insert("", "end", values=(
+                trago.nombre,
+                cantidad,
+                f"${trago.precio:.2f}",
+                f"${subtotal:.2f}",
+                "✖"
+            ))
+            
+            # Configurar evento para eliminar
+            self.pedido_tree.tag_bind(item_id, "<Button-1>", lambda e: self.eliminar_item_pedido(e, item_id))
+            
+            self.actualizar_total_pedido()
+            self.trago_cantidad.delete(0, "end")
+            self.trago_cantidad.insert(0, "1")
+            
+        except ValueError:
+            messagebox.showerror("Error", "Cantidad debe ser un número entero")
+
+    def eliminar_item_pedido(self, event, item_id):
+        # Verificar si se hizo click en la columna de eliminar (última columna)
+        column = self.pedido_tree.identify_column(event.x)
+        if column == "#5":
+            self.pedido_tree.delete(item_id)
+            self.actualizar_total_pedido()
+
+    def actualizar_total_pedido(self):
+        total = 0.0
+        for item in self.pedido_tree.get_children():
+            subtotal_str = self.pedido_tree.item(item, "values")[3]
+            subtotal = float(subtotal_str.replace("$", ""))
+            total += subtotal
+        
+        self.pedido_total.configure(text=f"Total: ${total:.2f}")
+
+    def confirmar_pedido_tragos(self):
+        cliente_str = self.lista_clientes.get()
+        items = self.pedido_tree.get_children()
+        
+        if not cliente_str:
+            messagebox.showwarning("Advertencia", "Seleccione un cliente primero")
+            return
+        
+        if not items:
+            messagebox.showwarning("Advertencia", "Agregue al menos un trago al pedido")
+            return
+        
+        try:
+            # Obtener RUT del cliente
+            cliente_rut = cliente_str.split("(")[-1].rstrip(")")
+            cliente = ClienteDiscotecaCRUD.obtener_por_rut(self.db, cliente_rut)
+            
+            if not cliente:
+                messagebox.showerror("Error", "Cliente no encontrado")
+                return
+            
+            # Preparar detalles del pedido
+            detalles = {}
+            for item in items:
+                values = self.pedido_tree.item(item, "values")
+                trago_nombre = values[0]
+                cantidad = int(values[1])
+                
+                trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+                detalles[trago.id] = cantidad
+            
+            # Calcular total
+            total = sum(
+                self.db.query(Trago.precio).filter(Trago.id == trago_id).scalar() * cantidad
+                for trago_id, cantidad in detalles.items()
+            )
+            
+            # Crear pedido
+            pedido = PedidoTrago(
+                cliente_id=cliente.id,
+                total=total,
+                detalles=detalles,
+                estado="Confirmado"
+            )
+            
+            self.db.add(pedido)
+            self.db.commit()
+            
+            # Generar boleta
+            self.generar_boleta_tragos(pedido.id)
+            
+            messagebox.showinfo("Éxito", f"Pedido #{pedido.id} registrado\nBoleta generada: boleta_pedido_{pedido.id}.pdf")
+            self.limpiar_pedido()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo completar el pedido: {str(e)}")
+
+
+    def generar_boleta_tragos(self, pedido_id):
+        pedido = self.db.query(PedidoTrago).filter(PedidoTrago.id == pedido_id).first()
+        cliente = self.db.query(ClienteDiscoteca).filter(ClienteDiscoteca.id == pedido.cliente_id).first()
+        
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # Encabezado
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(0, 10, "Boleta de Pedido - Discoteca", 0, 1, "C")
+        pdf.ln(10)
+        
+        # Información del cliente
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, f"Cliente: {cliente.nombre}", 0, 1)
+        pdf.cell(0, 10, f"RUT: {cliente.rut}", 0, 1)
+        pdf.cell(0, 10, f"Fecha: {pedido.fecha.strftime('%Y-%m-%d %H:%M')}", 0, 1)
+        pdf.ln(10)
+        
+        # Detalles del pedido
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(40, 10, "Trago", 1)
+        pdf.cell(30, 10, "Cantidad", 1)
+        pdf.cell(40, 10, "Precio Unitario", 1)
+        pdf.cell(40, 10, "Subtotal", 1)
+        pdf.ln()
+        
+        pdf.set_font("Arial", "", 12)
+        for trago_id, cantidad in pedido.detalles.items():
+            trago = self.db.query(Trago).filter(Trago.id == trago_id).first()
+            subtotal = trago.precio * cantidad
+            
+            pdf.cell(40, 10, trago.nombre, 1)
+            pdf.cell(30, 10, str(cantidad), 1)
+            pdf.cell(40, 10, f"${trago.precio:.2f}", 1)
+            pdf.cell(40, 10, f"${subtotal:.2f}", 1)
+            pdf.ln()
+        
+        # Total
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(0, 10, f"Total: ${pedido.total:.2f}", 0, 1, "R")
+        pdf.ln(10)
+        
+        # Pie de página
+        pdf.set_font("Arial", "I", 10)
+        pdf.cell(0, 10, "¡Gracias por su compra!", 0, 1, "C")
+        
+        # Guardar PDF
+        nombre_archivo = f"boleta_pedido_{pedido_id}.pdf"
+        pdf.output(nombre_archivo)
+        messagebox.showinfo("Éxito", f"Boleta generada: {nombre_archivo}")
+
+    def limpiar_pedido(self):
+        # Limpiar Treeview
+        for item in self.pedido_tree.get_children():
+            self.pedido_tree.delete(item)
+        
+        # Resetear controles
+        self.pedido_total.configure(text="Total: $0.00")
+        self.lista_clientes.set("")
+        self.busqueda_cliente.delete(0, "end")
+        self.lista_tragos.set("")
+        self.busqueda_trago.delete(0, "end")
+        self.trago_cantidad.delete(0, "end")
+        self.trago_cantidad.insert(0, "1")
+        self.cliente_seleccionado_label.configure(
+            text="Ningún cliente seleccionado",
+            font=("Arial", 12)
+        )
+
+    def actualizar_lista_clientes_combo(self):
+        clientes = ClienteDiscotecaCRUD.obtener_todos(self.db)
+        valores = [f"{c.nombre} ({c.rut})" for c in clientes]
+        self.lista_clientes.configure(values=valores)
+
+    def filtrar_clientes(self, event):
+        busqueda = self.busqueda_cliente.get().lower()
+        clientes = ClienteDiscotecaCRUD.obtener_todos(self.db)
+        
+        if busqueda:
+            filtrados = [f"{c.nombre} ({c.rut})" for c in clientes 
+                        if busqueda in c.nombre.lower() or busqueda in c.rut]
+        else:
+            filtrados = [f"{c.nombre} ({c.rut})" for c in clientes]
+        
+        self.lista_clientes.configure(values=filtrados)
+        self.lista_clientes.set("")
+
+    def actualizar_lista_tragos_combo(self):
+        tragos = TragoCRUD.obtener_todos(self.db)
+        valores = [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
+        self.lista_tragos.configure(values=valores)
+
+    def filtrar_tragos(self, event):
+        busqueda = self.busqueda_trago.get().lower()
+        tragos = TragoCRUD.obtener_todos(self.db)
+        
+        if busqueda:
+            filtrados = [f"{t.nombre} (${t.precio:.2f})" for t in tragos 
+                        if busqueda in t.nombre.lower() or 
+                        busqueda in (t.categoria.lower() if t.categoria else "")]
+        else:
+            filtrados = [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
+        
+        self.lista_tragos.configure(values=filtrados)
+        self.lista_tragos.set("")
+
+    def on_cliente_seleccionado(self, event=None):
+        cliente_str = self.lista_clientes.get()
+        if cliente_str:
+            self.cliente_seleccionado_label.configure(
+                text=f"Cliente seleccionado: {cliente_str.split('(')[0].strip()}",
+                font=("Arial", 12, "bold")
+            )
+        else:
+            self.cliente_seleccionado_label.configure(
+                text="Ningún cliente seleccionado",
+                font=("Arial", 12)
+            )       
 
 if __name__ == "__main__":
     app = DiscotecaApp()
