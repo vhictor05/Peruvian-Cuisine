@@ -37,6 +37,7 @@ class DiscotecaApp(ctk.CTk):
         self.create_menu_button("Eventos", self.show_eventos)
         self.create_menu_button("Clientes", self.show_clientes)
         self.create_menu_button("Tragos", self.show_tragos)
+        TragoCRUD.inicializar_tragos(self.db) #Solo agrega los datos de Tragos de la BD en la app
         
         self.show_eventos()
 
@@ -237,15 +238,42 @@ class DiscotecaApp(ctk.CTk):
         form_frame = ctk.CTkFrame(tab)
         form_frame.pack(fill="x", padx=10, pady=10)
         
-        self.trago_nombre = self.create_form_entry(form_frame, "Nombre", 0)
-        self.trago_descripcion = self.create_form_entry(form_frame, "Descripción", 1)
-        self.trago_precio = self.create_form_entry(form_frame, "Precio", 2)
-        self.trago_categoria = self.create_form_entry(form_frame, "Categoría", 3)
+        # Combobox para seleccionar trago existente
+        ctk.CTkLabel(form_frame, text="Seleccionar Trago:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.trago_seleccionado = ctk.CTkComboBox(form_frame, state="readonly")
+        self.trago_seleccionado.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         
-        ctk.CTkButton(tab, text="Registrar Trago", command=self.registrar_trago).pack(pady=10)
+        # Campo para modificar precio
+        ctk.CTkLabel(form_frame, text="Precio:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.trago_precio = ctk.CTkEntry(form_frame)
+        self.trago_precio.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        
+        # Checkbox para disponibilidad
+        self.trago_disponible = ctk.CTkCheckBox(form_frame, text="Disponible")
+        self.trago_disponible.grid(row=2, column=0, columnspan=2, padx=5, pady=5, sticky="w")
+        
+        # Botones
+        btn_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=10, pady=10)
+        
+        ctk.CTkButton(
+            btn_frame, 
+            text="Actualizar Precio",
+            command=self.actualizar_precio_trago
+        ).pack(side="left", padx=5)
+        
+        ctk.CTkButton(
+            btn_frame, 
+            text="Cambiar Disponibilidad",
+            command=self.cambiar_disponibilidad_trago
+        ).pack(side="left", padx=5)
+        
+        # Actualizar lista de tragos
+        self.actualizar_lista_tragos_combobox()
+        self.trago_seleccionado.bind("<<ComboboxSelected>>", self.on_trago_selected)
         
         # Lista de tragos
-        columns = ["ID", "Nombre", "Descripción", "Precio", "Categoría"]
+        columns = ["ID", "Nombre", "Precio", "Categoría", "Disponible"]
         self.trago_tree = ttk.Treeview(tab, columns=columns, show="headings")
         for col in columns:
             self.trago_tree.heading(col, text=col)
@@ -518,6 +546,59 @@ class DiscotecaApp(ctk.CTk):
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo completar el pedido: {str(e)}")
 
+    def actualizar_lista_tragos_combobox(self):
+        tragos = TragoCRUD.obtener_todos(self.db)
+        valores = [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
+        self.trago_seleccionado.configure(values=valores)
+
+    def on_trago_selected(self, event):
+        trago_str = self.trago_seleccionado.get()
+        if trago_str:
+            trago_nombre = trago_str.split(" ($")[0]
+            trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+            if trago:
+                self.trago_precio.delete(0, "end")
+                self.trago_precio.insert(0, str(trago.precio))
+                self.trago_disponible.select() if trago.disponible else self.trago_disponible.deselect()
+
+    def actualizar_precio_trago(self):
+        try:
+            trago_str = self.trago_seleccionado.get()
+            nuevo_precio = float(self.trago_precio.get())
+            
+            if not trago_str:
+                messagebox.showwarning("Advertencia", "Seleccione un trago primero")
+                return
+                
+            trago_nombre = trago_str.split(" ($")[0]
+            trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+            
+            if trago:
+                TragoCRUD.actualizar_precio(self.db, trago.id, nuevo_precio)
+                messagebox.showinfo("Éxito", "Precio actualizado correctamente")
+                self.actualizar_lista_tragos()
+                self.actualizar_lista_tragos_combobox()
+                self.actualizar_lista_tragos_combo()  # Para la pestaña de pedidos
+        except ValueError:
+            messagebox.showerror("Error", "Ingrese un precio válido")
+
+    def cambiar_disponibilidad_trago(self):
+        trago_str = self.trago_seleccionado.get()
+        if not trago_str:
+            messagebox.showwarning("Advertencia", "Seleccione un trago primero")
+            return
+            
+        trago_nombre = trago_str.split(" ($")[0]
+        trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+        
+        if trago:
+            nueva_disponibilidad = self.trago_disponible.get()
+            TragoCRUD.cambiar_disponibilidad(self.db, trago.id, nueva_disponibilidad)
+            estado = "disponible" if nueva_disponibilidad else "no disponible"
+            messagebox.showinfo("Éxito", f"Trago marcado como {estado}")
+            self.actualizar_lista_tragos()
+            self.actualizar_lista_tragos_combobox()
+            self.actualizar_lista_tragos_combo()  # Para la pestaña de pedidos
 
     def generar_boleta_tragos(self, pedido_id):
         pedido = self.db.query(PedidoTrago).filter(PedidoTrago.id == pedido_id).first()
