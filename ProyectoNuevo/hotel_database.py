@@ -17,3 +17,11 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# Agregar una función para eliminar las tablas y recrearlas
+def recreate_db():
+    # Eliminar las tablas existentes
+    Base.metadata.drop_all(bind=engine)
+    
+    # Crear las tablas nuevas con la nueva configuración de relaciones
+    Base.metadata.create_all(bind=engine)
