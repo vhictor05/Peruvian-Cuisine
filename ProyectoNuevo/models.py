@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from database import Base
 from hotel_database import Base
 from disco_database import Base
-
+from datetime import datetime, timedelta
 
 class Cliente(Base):
     __tablename__ = "clientes"
@@ -137,3 +137,37 @@ class ReservaMesa(Base):
     cliente = relationship("ClienteDiscoteca", back_populates="reservas_mesa")
     mesa = relationship("Mesa", back_populates="reservas")
  
+class Trago(Base):
+    __tablename__ = 'tragos'
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(100), nullable=False, unique=True)
+    descripcion = Column(String(255))
+    precio = Column(Float, nullable=False)
+    categoria = Column(String(50))
+    disponible = Column(Boolean, default=True)
+
+class PedidoTrago(Base):
+    __tablename__ = 'pedidos_tragos'
+    id = Column(Integer, primary_key=True)
+    cliente_id = Column(Integer, ForeignKey('clientes_discoteca.id'))
+    fecha = Column(DateTime, default=datetime.now)
+    total = Column(Float, nullable=False)
+    estado = Column(String(20), default='Pendiente')
+    detalles = Column(JSON)  # Almacenará {trago_id: cantidad}
+
+    cliente = relationship("ClienteDiscoteca")
+
+# Tabla de Reportes (BETA)
+class ReporteError(Base):
+    __tablename__ = 'reportes_errores'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    fecha = Column(DateTime, default=datetime.now)
+    titulo = Column(String(200), nullable=False)
+    modulo = Column(String(50), nullable=False)
+    urgencia = Column(String(20), nullable=False)
+    descripcion = Column(Text, nullable=False)
+    estado = Column(String(20), default="Abierto")
+    reportado_por = Column(String(100))
+    comentarios = Column(Text)
+    fecha_resolucion = Column(DateTime)
