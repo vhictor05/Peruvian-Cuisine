@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 from graficos import  graficar_menus_mas_comprados, graficar_uso_ingredientes,graficar_ventas_por_fecha
 
 # Configuración global de estilos
-ctk.set_appearance_mode("dark")  # Opciones: "dark", "light", "system"
-ctk.set_default_color_theme("blue")  # Opciones: "blue", "green", "dark-blue"
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
 Base.metadata.create_all(bind=engine)
 
@@ -29,19 +29,24 @@ class MainApp(ctk.CTk):
         super().__init__()
         self.title("Gestión de Restaurante")
         self.geometry("1300x700")
-        self.configure(fg_color="#1c1c1c")  # Fondo oscuro
+        self.configure(fg_color="#1e1e2d")  # Fondo oscuro
 
         # Menú lateral
-        self.menu_frame = ctk.CTkFrame(self, fg_color="#2c2c2c", corner_radius=10)
-        self.menu_frame.grid(row=0, column=0, sticky="ns", padx=10, pady=10)
+        self.menu_frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=0)
+        self.menu_frame.grid(row=0, column=0, sticky="ns", padx=0, pady=0)
 
         # Contenedor principal
-        self.main_frame = ctk.CTkFrame(self, fg_color="#1c1c1c", corner_radius=10, width=800, height=700)
-        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        self.main_frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15, width=800, height=700)
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=30, pady=30)
 
         # Título del menú
-        self.app_title = ctk.CTkLabel(self.menu_frame, text="Restaurante App", font=("Arial", 24, "bold"))
-        self.app_title.grid(row=0, column=0, pady=20)
+        self.app_title = ctk.CTkLabel(
+            self.menu_frame, 
+            text="Restaurante App", 
+            text_color="#4361ee", 
+            font=("Arial", 23)
+        )
+        self.app_title.grid(row=0, column=0, pady=50)
 
         # Botones de navegación
         self.create_menu_button("Clientes", "ClientePanel", 1)
@@ -59,10 +64,10 @@ class MainApp(ctk.CTk):
             text=text,
             command=lambda: self.load_panel(panel_name),
             font=("Arial", 16, "bold"),
-            corner_radius=10,
+            corner_radius=50,
             height=40,
-            fg_color="#3c99dc",
-            hover_color="#4da9eb",
+            fg_color="#4361ee",
+            hover_color="#5a75f0",
         )
         button.grid(row=row, column=0, pady=15, padx=10, sticky="ew")
 
@@ -99,11 +104,16 @@ class ClientePanel(ctk.CTkFrame):
     def __init__(self, parent, db):
         super().__init__(parent)
         self.db = db
-        self.configure(fg_color="#1c1c1c")
+        self.configure(fg_color="#25253e", corner_radius=15)
 
         # Título
-        self.label_title = ctk.CTkLabel(self, text="Gestión de Clientes", font=("Arial", 22, "bold"))
-        self.label_title.grid(row=0, column=0, pady=10)
+        self.label_title = ctk.CTkLabel(
+            self, 
+            text="Gestión de Clientes", 
+            text_color="#4361ee",
+            font=("Arial", 28, "bold")
+        )
+        self.label_title.grid(row=0, column=0, columnspan=2, pady=20)
 
         # Formulario
         self.nombre_entry = self.create_form_entry("Nombre del Cliente", 1)
@@ -111,22 +121,56 @@ class ClientePanel(ctk.CTkFrame):
         self.rut_entry = self.create_form_entry("Rut del Cliente", 3)
 
         # Botones de acción
-        self.add_button = ctk.CTkButton(self, text="Registrar Cliente", command=self.add_cliente, corner_radius=10)
-        self.add_button.grid(row=4, column=0, pady=10)
+        btn_frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15)
+        btn_frame.grid(row=4, column=0, pady=10, padx=10, sticky="ew")
 
-        self.update_button = ctk.CTkButton(self, text="Editar Cliente", command=self.open_edit_window, corner_radius=10)
-        self.update_button.grid(row=5, column=0, pady=10)
+        self.add_button = ctk.CTkButton(
+            btn_frame,
+            text="Registrar Cliente",
+            command=self.add_cliente,
+            fg_color="#4361ee",
+            hover_color="#5a75f0",
+            font=("Arial", 16, "bold"),
+            height=50,
+            width=150,
+            corner_radius=50
+        )
+        self.add_button.grid(row=0, column=0, padx=10, pady=5)
 
-        self.delete_button = ctk.CTkButton(self, text="Eliminar Cliente", command=self.delete_cliente, corner_radius=10)
-        self.delete_button.grid(row=6, column=0, pady=10)
+        self.update_button = ctk.CTkButton(
+            btn_frame,
+            text="Editar Cliente",
+            command=self.open_edit_window,
+            fg_color="#4361ee",
+            hover_color="#5a75f0",
+            font=("Arial", 16, "bold"),
+            height=50,
+            width=150,
+            corner_radius=50
+        )
+        self.update_button.grid(row=0, column=1, padx=10, pady=5)
 
-        # Lista de clientes
+        self.delete_button = ctk.CTkButton(
+            btn_frame,
+            text="Eliminar Cliente",
+            command=self.delete_cliente,
+            fg_color="#4361ee",
+            hover_color="#5a75f0",
+            font=("Arial", 16, "bold"),
+            height=50,
+            width=150,
+            corner_radius=50
+        )
+        self.delete_button.grid(row=1, column=0, columnspan=2, pady=10)
+
+        # Lista de clientes (Treeview)
         self.cliente_list = self.create_treeview(Cliente)
-        self.cliente_list.grid(row=7, column=0, pady=20, sticky="nsew")
-        self.cliente_list.bind("<<TreeviewSelect>>", self.on_select)  # Bind select event
+        self.cliente_list.grid(row=1, column=1, rowspan=4, pady=10, padx=10, sticky="nsew")
+
+        # Configuración de columnas y filas
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(7, weight=1)
-        self.refresh_list()
+        self.grid_columnconfigure(1, weight=2)
+        self.grid_rowconfigure(4, weight=1)
 
     def create_treeview(self, model_class):
         columns = [column.name for column in model_class.__table__.columns]
@@ -136,13 +180,19 @@ class ClientePanel(ctk.CTkFrame):
         return treeview
 
     def create_form_entry(self, label_text, row):
-        frame = ctk.CTkFrame(self, fg_color="#2c2c2c", corner_radius=10)
+        frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15)
         frame.grid(row=row, column=0, pady=10, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
         label.pack(side="left", padx=10)
 
-        entry = ctk.CTkEntry(frame, corner_radius=10)
+        entry = ctk.CTkEntry(
+            frame, 
+            fg_color="#1e1e2d",
+            border_color="#4361ee", 
+            border_width=2, 
+            corner_radius=10
+        )
         entry.pack(side="right", fill="x", expand=True, padx=10)
 
         return entry
@@ -204,22 +254,36 @@ class ClientePanel(ctk.CTkFrame):
             self.edit_window.geometry("400x300")
             self.edit_window.configure(fg_color="#1c1c1c")
 
-            self.edit_nombre_entry = self.create_form_entry_in_window("Nombre del Cliente", 1, cliente.nombre)
-            self.edit_email_entry = self.create_form_entry_in_window("Email del Cliente", 2, cliente.email)
-            self.edit_rut_entry = self.create_form_entry_in_window("Rut del Cliente", 3, cliente.rut)
+            self.edit_nombre_entry = self.create_form_entry_in_window("Nombre del Cliente:", 1, cliente.nombre)
+            self.edit_email_entry = self.create_form_entry_in_window("Email del Cliente:", 2, cliente.email)
+            self.edit_rut_entry = self.create_form_entry_in_window("Rut del Cliente:", 3, cliente.rut)
             self.edit_rut_entry.configure(state="disabled")
 
-            self.save_button = ctk.CTkButton(self.edit_window, text="Guardar Cambios", command=lambda: self.update_cliente(cliente_rut), corner_radius=10)
+            self.save_button = ctk.CTkButton(
+                self.edit_window, 
+                text="Guardar Cambios", 
+                command=lambda: self.update_cliente(cliente_rut), 
+                corner_radius=50,
+                fg_color="#4361ee",
+                hover_color="#5a75f0"
+            )
             self.save_button.grid(row=5, column=0, pady=10)
 
     def create_form_entry_in_window(self, label_text, row, value):
-        frame = ctk.CTkFrame(self.edit_window, fg_color="#2c2c2c", corner_radius=10)
+        frame = ctk.CTkFrame(self.edit_window, fg_color="#25253e", corner_radius=15)
         frame.grid(row=row, column=0, pady=5, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
         label.pack(side="left", padx=10)
 
-        entry = ctk.CTkEntry(frame, corner_radius=10, width=200)
+        entry = ctk.CTkEntry(
+            frame,
+            corner_radius=10, 
+            width=200,
+            fg_color="#1e1e2d",
+            border_color="#4361ee",
+            border_width=2
+        )
         entry.insert(0, value)
         entry.pack(side="right", fill="x", expand=True, padx=10)
 
@@ -302,30 +366,74 @@ class IngredientePanel(ctk.CTkFrame):
     def __init__(self, parent, db):
         super().__init__(parent)
         self.db = db
-        self.configure(fg_color="#1c1c1c")
+        self.configure(fg_color="#25253e", corner_radius=15)
 
-        self.label_title = ctk.CTkLabel(self, text="Gestión de Ingredientes", font=("Arial", 22, "bold"))
-        self.label_title.grid(row=0, column=0, pady=10)
+        # Título
+        self.label_title = ctk.CTkLabel(
+            self, 
+            text="Gestión de Ingredientes", 
+            text_color="#4361ee", 
+            font=("Arial", 28, "bold")
+        )
+        self.label_title.grid(row=0, column=0, columnspan=2, pady=20)
 
+        # Formulario
         self.nombre_entry = self.create_form_entry("Nombre", 1)
         self.tipo_entry = self.create_form_entry("Tipo", 2)
         self.cantidad_entry = self.create_form_entry("Cantidad", 3)
         self.unidad_entry = self.create_form_entry("Unidad de Medida", 4)
 
-        self.add_button = ctk.CTkButton(self, text="Añadir Ingrediente", command=self.add_ingrediente, corner_radius=10)
-        self.add_button.grid(row=5, column=0, pady=10)
+        # Botones de acción
+        btn_frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15)
+        btn_frame.grid(row=5, column=0, pady=10, padx=10, sticky="ew")
 
-        self.upgrade_button = ctk.CTkButton(self, text="Actualizar Ingrediente", command=self.open_edit_window, corner_radius=10)
-        self.upgrade_button.grid(row=6, column=0, pady=10)
+        self.add_button = ctk.CTkButton(
+            btn_frame, 
+            text="Añadir Ingrediente", 
+            command=self.add_ingrediente, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0",
+            font=("Arial", 18, "bold"),
+            height=50,
+            width=150
+        )
+        self.add_button.grid(row=0, column=0, padx=10, pady=5)
 
-        self.delete_button = ctk.CTkButton(self, text="Eliminar Ingrediente", command=self.delete_ingrediente, corner_radius=10)
-        self.delete_button.grid(row=7, column=0, pady=10)
+        self.update_button = ctk.CTkButton(
+            btn_frame, 
+            text="Actualizar Ingrediente", 
+            command=self.open_edit_window, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0",
+            font=("Arial", 18, "bold"),
+            height=50,
+            width=150
+        )
+        self.update_button.grid(row=1, column=0, padx=10, pady=5)
 
+        self.delete_button = ctk.CTkButton(
+            btn_frame, 
+            text="Eliminar Ingrediente", 
+            command=self.delete_ingrediente, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0",
+            font=("Arial", 18, "bold"),
+            height=50,
+            width=150
+        )
+        self.delete_button.grid(row=2, column=0, columnspan=2, pady=10)
+
+        # Lista de ingredientes (Treeview)
         self.ingrediente_list = self.create_treeview(Ingrediente)
-        self.ingrediente_list.grid(row=8, column=0, pady=10, sticky="nsew")
+        self.ingrediente_list.grid(row=1, column=1, rowspan=5, pady=10, padx=10, sticky="nsew")
+
+        # Configuración de columnas y filas
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(8, weight=1)
-        self.refresh_list()
+        self.grid_columnconfigure(1, weight=2)
+        self.grid_rowconfigure(5, weight=1)
 
     def create_treeview(self, model_class):
         columns = [column.name for column in model_class.__table__.columns if column.name != 'id']
@@ -335,13 +443,19 @@ class IngredientePanel(ctk.CTkFrame):
         return treeview
 
     def create_form_entry(self, label_text, row):
-        frame = ctk.CTkFrame(self, fg_color="#2c2c2c", corner_radius=10)
-        frame.grid(row=row, column=0, pady=5, padx=10, sticky="ew")
+        frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15)
+        frame.grid(row=row, column=0, pady=10, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
         label.pack(side="left", padx=10)
 
-        entry = ctk.CTkEntry(frame, corner_radius=10, width=200)
+        entry = ctk.CTkEntry(
+            frame, 
+            fg_color="#1e1e2d",
+            border_color="#4361ee", 
+            border_width=2, 
+            corner_radius=10
+        )
         entry.pack(side="right", fill="x", expand=True, padx=10)
 
         return entry
@@ -392,19 +506,33 @@ class IngredientePanel(ctk.CTkFrame):
             self.edit_cantidad_entry = self.create_form_entry_in_window("Cantidad", 3, ingrediente.cantidad)
             self.edit_unidad_entry = self.create_form_entry_in_window("Unidad de Medida", 4, ingrediente.unidad)
 
-            self.save_button = ctk.CTkButton(self.edit_window, text="Guardar Cambios", command=lambda: self.update_ingrediente(ingrediente.id), corner_radius=10)
+            self.save_button = ctk.CTkButton(
+                self.edit_window, 
+                text="Guardar Cambios", 
+                command=lambda: self.update_ingrediente(ingrediente.id), 
+                corner_radius=50,
+                fg_color="#4361ee",
+                hover_color="#5a75f0"
+            )
             self.save_button.grid(row=5, column=0, pady=10)
 
     def create_form_entry_in_window(self, label_text, row, value):
-        frame = ctk.CTkFrame(self.edit_window, fg_color="#2c2c2c", corner_radius=10)
-        frame.grid(row=row, column=0, pady=5, padx=10, sticky="ew") 
+        frame = ctk.CTkFrame(self.edit_window, fg_color="#25253e", corner_radius=15)
+        frame.grid(row=row, column=0, pady=5, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
         label.pack(side="left", padx=10)
 
-        entry = ctk.CTkEntry(frame, corner_radius=10, width=200)   
+        entry = ctk.CTkEntry(
+            frame,
+            corner_radius=10, 
+            width=200,
+            fg_color="#1e1e2d",
+            border_color="#4361ee",
+            border_width=2
+        )
         entry.insert(0, value)
-        entry.pack(side="right", fill="x", expand=True, padx=10)    
+        entry.pack(side="right", fill="x", expand=True, padx=10)
 
         return entry    
     
@@ -472,48 +600,112 @@ class MenuPanel(ctk.CTkFrame):
     def __init__(self, parent, db):
         super().__init__(parent)
         self.db = db
-        self.configure(fg_color="#1c1c1c")
+        self.configure(fg_color="#25253e", corner_radius=15)
 
-        self.label_title = ctk.CTkLabel(self, text="Gestión de Menú", font=("Arial", 22, "bold"))
-        self.label_title.grid(row=0, column=0, pady=10)
+        self.label_title = ctk.CTkLabel(
+            self, 
+            text="Gestión de Menú", 
+            text_color="#4361ee",
+            font=("Arial", 28, "bold")
+        )
+        self.label_title.grid(row=0, column=0, pady=20)
 
         self.nombre_entry = self.create_form_entry("Nombre del Menú", 1)
         self.descripcion_entry = self.create_form_entry("Descripción del Menú", 2)
         self.precio_entry = self.create_form_entry("Precio del Menú", 3)
 
-        self.ingredientes_frame = ctk.CTkFrame(self, fg_color="#2c2c2c", corner_radius=10)
+        self.ingredientes_frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15)
         self.ingredientes_frame.grid(row=4, column=0, pady=10, padx=10, sticky="ew")
         self.ingredientes_label = ctk.CTkLabel(self.ingredientes_frame, text="Ingredientes", font=("Arial", 14))
         self.ingredientes_label.grid(row=0, column=0, padx=10, pady=5)
 
-        self.ingredientes_combobox = ctk.CTkComboBox(self.ingredientes_frame, values=[], width=200, corner_radius=10)
+        self.ingredientes_combobox = ctk.CTkComboBox(
+            self.ingredientes_frame, 
+            values=[], 
+            width=200, 
+            corner_radius=10,
+            fg_color="#4361ee",
+            button_color="#4361ee",
+            button_hover_color="#5a75f0",
+            dropdown_fg_color="#1e1e2d",
+            border_color="#4361ee"
+        )
         self.ingredientes_combobox.grid(row=1, column=0, padx=10, pady=5)
 
-        self.cantidad_entry = ctk.CTkEntry(self.ingredientes_frame, corner_radius=10, width=100)
+        self.cantidad_entry = ctk.CTkEntry(
+            self.ingredientes_frame, 
+            corner_radius=10, 
+            width=100,
+            fg_color="#1e1e2d",
+            border_color="#4361ee",
+            border_width=2
+        )
         self.cantidad_entry.grid(row=1, column=1, padx=10, pady=5)
 
-        self.add_ingrediente_button = ctk.CTkButton(self.ingredientes_frame, text="Añadir Ingrediente", command=self.add_ingrediente, corner_radius=10)
+        self.add_ingrediente_button = ctk.CTkButton(
+            self.ingredientes_frame, 
+            text="Añadir Ingrediente", 
+            command=self.add_ingrediente, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0",
+        )
         self.add_ingrediente_button.grid(row=1, column=2, padx=10, pady=5)
 
-        self.update_ingrediente_button = ctk.CTkButton(self.ingredientes_frame, text="Actualizar Ingrediente", command=self.update_ingrediente, corner_radius=10)
+        self.update_ingrediente_button = ctk.CTkButton(
+            self.ingredientes_frame, 
+            text="Actualizar Ingrediente", 
+            command=self.update_ingrediente, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.update_ingrediente_button.grid(row=1, column=3, padx=10, pady=5)
 
-        self.delete_ingrediente_button = ctk.CTkButton(self.ingredientes_frame, text="Eliminar Ingrediente", command=self.delete_ingrediente, corner_radius=10)
+        self.delete_ingrediente_button = ctk.CTkButton(
+            self.ingredientes_frame, 
+            text="Eliminar Ingrediente", 
+            command=self.delete_ingrediente, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.delete_ingrediente_button.grid(row=1, column=4, padx=10, pady=5)
 
         self.ingredientes_list = self.create_treeview_ingredientes()
         self.ingredientes_list.grid(row=2, column=0, columnspan=5, pady=10, sticky="nsew")
 
-        self.button_frame = ctk.CTkFrame(self, fg_color="#1c1c1c")
+        self.button_frame = ctk.CTkFrame(self, fg_color="#1e2e2d")
         self.button_frame.grid(row=5, column=0, pady=10, sticky="ew")
 
-        self.add_button = ctk.CTkButton(self.button_frame, text="Registrar Menú", command=self.add_menu, corner_radius=10)
+        self.add_button = ctk.CTkButton(
+            self.button_frame, 
+            text="Registrar Menú", 
+            command=self.add_menu, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.add_button.grid(row=0, column=0, padx=5)
 
-        self.update_button = ctk.CTkButton(self.button_frame, text="Editar Menú", command=self.open_edit_window, corner_radius=10)
+        self.update_button = ctk.CTkButton(
+            self.button_frame, 
+            text="Editar Menú", 
+            command=self.open_edit_window, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.update_button.grid(row=0, column=1, padx=5)
 
-        self.delete_button = ctk.CTkButton(self.button_frame, text="Eliminar Menú", command=self.delete_menu, corner_radius=10)
+        self.delete_button = ctk.CTkButton(
+            self.button_frame, 
+            text="Eliminar Menú", 
+            command=self.delete_menu, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.delete_button.grid(row=0, column=2, padx=5)
 
         self.menu_list = self.create_treeview(Menu)
@@ -683,13 +875,34 @@ class MenuPanel(ctk.CTkFrame):
             self.edit_cantidad_entry = ctk.CTkEntry(self.edit_ingredientes_frame, corner_radius=10, width=100)
             self.edit_cantidad_entry.grid(row=1, column=1, padx=10, pady=5)
 
-            self.edit_add_ingrediente_button = ctk.CTkButton(self.edit_ingredientes_frame, text="Añadir Ingrediente", command=self.edit_add_ingrediente, corner_radius=10)
+            self.edit_add_ingrediente_button = ctk.CTkButton(
+                self.edit_ingredientes_frame, 
+                text="Añadir Ingrediente", 
+                command=self.edit_add_ingrediente, 
+                corner_radius=50,
+                fg_color="#4361ee",
+                hover_color="#5a75f0"
+            )
             self.edit_add_ingrediente_button.grid(row=1, column=2, padx=10, pady=5)
 
-            self.edit_update_ingrediente_button = ctk.CTkButton(self.edit_ingredientes_frame, text="Actualizar Ingrediente", command=self.edit_update_ingrediente, corner_radius=10)
+            self.edit_update_ingrediente_button = ctk.CTkButton(
+                self.edit_ingredientes_frame, 
+                text="Actualizar Ingrediente", 
+                command=self.edit_update_ingrediente, 
+                corner_radius=50,
+                fg_color="#4361ee",
+                hover_color="#5a75f0"
+            )
             self.edit_update_ingrediente_button.grid(row=1, column=3, padx=10, pady=5)
 
-            self.edit_delete_ingrediente_button = ctk.CTkButton(self.edit_ingredientes_frame, text="Eliminar Ingrediente", command=self.edit_delete_ingrediente, corner_radius=10)
+            self.edit_delete_ingrediente_button = ctk.CTkButton(
+                self.edit_ingredientes_frame, 
+                text="Eliminar Ingrediente", 
+                command=self.edit_delete_ingrediente, 
+                corner_radius=50,
+                fg_color="#4361ee",
+                hover_color="#5a75f0"
+            )
             self.edit_delete_ingrediente_button.grid(row=1, column=4, padx=10, pady=5)
 
             self.edit_ingredientes_list = self.create_treeview_ingredientes()
@@ -698,19 +911,33 @@ class MenuPanel(ctk.CTkFrame):
             for ingrediente in menu.ingredientes:
                 self.edit_ingredientes_list.insert("", "end", values=(ingrediente.ingrediente.nombre, ingrediente.cantidad))
 
-            self.save_button = ctk.CTkButton(self.edit_window, text="Guardar Cambios", command=lambda: self.update_menu(menu.id), corner_radius=10)
+            self.save_button = ctk.CTkButton(
+                self.edit_window, 
+                text="Guardar Cambios", 
+                command=lambda: self.update_menu(menu.id), 
+                corner_radius=50,
+                fg_color="#4361ee",
+                hover_color="#5a75f0"
+            )
             self.save_button.grid(row=5, column=0, pady=10)
 
             self.load_ingredientes()
 
     def create_form_entry_in_window(self, label_text, row, value):
-        frame = ctk.CTkFrame(self.edit_window, fg_color="#2c2c2c", corner_radius=10)
+        frame = ctk.CTkFrame(self.edit_window, fg_color="#25253e", corner_radius=15)
         frame.grid(row=row, column=0, pady=5, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
         label.pack(side="left", padx=10)
 
-        entry = ctk.CTkEntry(frame, corner_radius=10, width=200)
+        entry = ctk.CTkEntry(
+            frame,
+            corner_radius=10, 
+            width=200,
+            fg_color="#1e1e2d",
+            border_color="#4361ee",
+            border_width=2
+        )
         entry.insert(0, value)
         entry.pack(side="right", fill="x", expand=True, padx=10)
 
@@ -858,13 +1085,19 @@ class MenuPanel(ctk.CTkFrame):
             self.precio_entry.insert(0, values[2])
 
     def create_form_entry(self, label_text, row):
-        frame = ctk.CTkFrame(self, fg_color="#2c2c2c", corner_radius=10)
+        frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15)
         frame.grid(row=row, column=0, pady=10, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
         label.pack(side="left", padx=10)
 
-        entry = ctk.CTkEntry(frame, corner_radius=10)
+        entry = ctk.CTkEntry(
+            frame, 
+            fg_color="#1e1e2d",
+            border_color="#4361ee", 
+            border_width=2, 
+            corner_radius=10
+        )
         entry.pack(side="right", fill="x", expand=True, padx=10)
 
         return entry
@@ -873,19 +1106,34 @@ class PanelCompra(ctk.CTkFrame):
     def __init__(self, parent, db):
         super().__init__(parent)
         self.db = db  
-        self.configure(fg_color="#1c1c1c")
+        self.configure(fg_color="#25253e")
 
         # Título del Panel de Compra
-        self.label_title = ctk.CTkLabel(self, text="Panel de Compra", font=("Arial", 24, "bold"), text_color="white")
+        self.label_title = ctk.CTkLabel(
+            self, 
+            text="Panel de Compra", 
+            text_color="#4361ee",
+            font=("Arial", 28, "bold")
+        )
         self.label_title.grid(row=0, column=0, pady=20, columnspan=2) 
 
         # Frame para la entrada de productos y cantidad
-        self.entry_frame = ctk.CTkFrame(self, fg_color="#2c2c2c", corner_radius=10)
+        self.entry_frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=10)
         self.entry_frame.grid(row=1, column=0, pady=10, padx=20, sticky="ew", columnspan=2)
 
         # Combobox para seleccionar un menú
-        self.menu_combobox = ctk.CTkComboBox(self.entry_frame, values=[], width=300, corner_radius=10)
-        self.menu_combobox.set("Selecciona un menú")  # Texto por defecto
+        self.menu_combobox = ctk.CTkComboBox(
+            self.entry_frame, 
+            values=[], 
+            width=300, 
+            corner_radius=10,
+            fg_color="#4361ee",
+            button_color="#4361ee",
+            button_hover_color="#5a75f0",
+            dropdown_fg_color="#1e1e2d",
+            border_color="#4361ee"
+        )
+        self.menu_combobox.set("Selecciona un menú")
         self.menu_combobox.grid(row=0, column=0, padx=10)
 
         # Entrada de cantidad
@@ -893,7 +1141,14 @@ class PanelCompra(ctk.CTkFrame):
         self.cantidad_entry.grid(row=0, column=1, padx=10)
 
         # Botón para agregar al carrito
-        self.add_button = ctk.CTkButton(self.entry_frame, text="Agregar al carrito", command=self.add_to_cart, corner_radius=10)
+        self.add_button = ctk.CTkButton(
+            self.entry_frame, 
+            text="Agregar al carrito", 
+            command=self.add_to_cart, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.add_button.grid(row=0, column=2, padx=10)  # Adjust column index
 
         # Lista de productos en el carrito
@@ -901,7 +1156,14 @@ class PanelCompra(ctk.CTkFrame):
         self.cart_list.grid(row=2, column=0, pady=10, sticky="nsew", columnspan=2)
 
         # Botón para realizar compra
-        self.buy_button = ctk.CTkButton(self, text="Realizar Compra", command=self.complete_purchase, corner_radius=10, fg_color="#3c99dc")
+        self.buy_button = ctk.CTkButton(
+            self, 
+            text="Realizar Compra", 
+            command=self.complete_purchase, 
+            corner_radius=50, 
+            fg_color="#4361ee", 
+            hover_color="#5a75f0"
+        )
         self.buy_button.grid(row=3, column=0, pady=10, columnspan=2)
 
         # Label para el total
@@ -911,21 +1173,37 @@ class PanelCompra(ctk.CTkFrame):
         # Lista interna para almacenar los productos seleccionados
         self.cart = []  # Aquí guardaremos los productos y cantidades seleccionadas
 
-        self.cliente_combobox = ctk.CTkComboBox(self.entry_frame, values=[], width=300, corner_radius=10)
-        self.cliente_combobox.set("Selecciona un cliente")  # Texto por defecto
-        self.cliente_combobox.grid(row=0, column=3, padx=10)  # Adjust column index
+        self.cliente_combobox = ctk.CTkComboBox(
+            self.entry_frame, 
+            values=[], 
+            width=300, 
+            corner_radius=10,
+            fg_color="#4361ee",
+            button_color="#4361ee",
+            button_hover_color="#5a75f0",
+            dropdown_fg_color="#1e1e2d",
+            border_color="#4361ee"
+        )
+        self.cliente_combobox.set("Selecciona un cliente")
+        self.cliente_combobox.grid(row=0, column=3, padx=5)
 
         self.load_clientes()  # Ensure clients are loaded into the combobox
         self.load_menus()  # Ensure menus are loaded into the combobox
 
     def create_form_entry(self, label_text, row, column):
-        frame = ctk.CTkFrame(self.entry_frame, fg_color="#2c2c2c", corner_radius=10)
+        frame = ctk.CTkFrame(self.entry_frame, fg_color="#25253e", corner_radius=15)
         frame.grid(row=row, column=column, pady=10, padx=10, sticky="ew")
 
-        label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14), text_color="white")
+        label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
         label.grid(row=0, column=0, padx=10)
 
-        entry = ctk.CTkEntry(frame, corner_radius=10)
+        entry = ctk.CTkEntry(
+            frame, 
+            corner_radius=10,
+            fg_color="#1e1e2d",
+            border_color="#4361ee",
+            border_width=2
+        )
         entry.grid(row=0, column=1, padx=10)
 
         return entry
@@ -1088,10 +1366,24 @@ class PanelPedido(ctk.CTkFrame):
         self.fecha_filter = self.create_filter_entry("Filtrar por Fecha (YYYY-MM-DD)", 1)
         self.monto_filter = self.create_filter_entry("Filtrar por Monto Mayor a", 2)
 
-        self.apply_filter_button = ctk.CTkButton(self.filter_frame, text="Aplicar Filtros", command=self.apply_filters, corner_radius=10)
+        self.apply_filter_button = ctk.CTkButton(
+            self.filter_frame, 
+            text="Aplicar Filtros", 
+            command=self.apply_filters, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.apply_filter_button.grid(row=0, column=3, padx=10)
 
-        self.clear_filter_button = ctk.CTkButton(self.filter_frame, text="Limpiar Filtros", command=self.clear_filters, corner_radius=10)
+        self.clear_filter_button = ctk.CTkButton(
+            self.filter_frame, 
+            text="Limpiar Filtros", 
+            command=self.clear_filters, 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.clear_filter_button.grid(row=0, column=4, padx=10)
 
         # Treeview para mostrar los pedidos
@@ -1102,10 +1394,24 @@ class PanelPedido(ctk.CTkFrame):
         self.btn_frame = ctk.CTkFrame(self)
         self.btn_frame.grid(row=3, column=0, pady=5, columnspan=3)
 
-        self.btn_edit = ctk.CTkButton(self.btn_frame, text="Editar Pedido", command=self.edit_pedido)
+        self.btn_edit = ctk.CTkButton(
+            self.btn_frame, 
+            text="Editar Pedido", 
+            command=self.edit_pedido,
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.btn_edit.grid(row=0, column=1, padx=5)
 
-        self.btn_delete = ctk.CTkButton(self.btn_frame, text="Eliminar Pedido", command=self.delete_pedido)
+        self.btn_delete = ctk.CTkButton(
+            self.btn_frame, 
+            text="Eliminar Pedido", 
+            command=self.delete_pedido,
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
         self.btn_delete.grid(row=0, column=2, padx=5)
 
         self.grid_columnconfigure(1, weight=1)
@@ -1123,25 +1429,42 @@ class PanelPedido(ctk.CTkFrame):
         return treeview
 
     def create_filter_entry(self, label_text, column):
-        frame = ctk.CTkFrame(self.filter_frame, fg_color="#2c2c2c", corner_radius=10)
+        frame = ctk.CTkFrame(self.filter_frame, fg_color="#25253e", corner_radius=15)
         frame.grid(row=0, column=column, pady=5, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
         label.pack(side="left", padx=10)
 
-        entry = ctk.CTkEntry(frame, corner_radius=10, width=200)
+        entry = ctk.CTkEntry(
+            frame, 
+            corner_radius=10, 
+            width=200,
+            fg_color="#1e1e2d",
+            border_color="#4361ee",
+            border_width=2
+        )
         entry.pack(side="right", fill="x", expand=True, padx=10)
 
         return entry
 
     def create_filter_combobox(self, label_text, column):
-        frame = ctk.CTkFrame(self.filter_frame, fg_color="#2c2c2c", corner_radius=10)
+        frame = ctk.CTkFrame(self.filter_frame, fg_color="#25253e", corner_radius=15)
         frame.grid(row=0, column=column, pady=5, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
         label.pack(side="left", padx=10)
 
-        combobox = ctk.CTkComboBox(frame, values=[], width=200, corner_radius=10)
+        combobox = ctk.CTkComboBox(
+            frame, 
+            values=[], 
+            width=200, 
+            corner_radius=10,
+            fg_color="#4361ee",
+            button_color="#4361ee",
+            button_hover_color="#5a75f0",
+            dropdown_fg_color="#1e1e2d",
+            border_color="#4361ee"
+        )
         combobox.pack(side="right", fill="x", expand=True, padx=10)
 
         return combobox
@@ -1234,7 +1557,9 @@ class PanelPedido(ctk.CTkFrame):
             self.edit_window,
             text="Guardar Cambios",
             command=lambda: self.save_pedido_description(pedido_id, entry_desc.get()),
-            corner_radius=10
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
         )
         save_button.grid(row=1, column=0, columnspan=2, pady=20)
 
@@ -1284,10 +1609,15 @@ class GraficosPanel(ctk.CTkFrame):
     def __init__(self, parent, db):
         super().__init__(parent)
         self.db = db
-        self.configure(fg_color="#1c1c1c")
+        self.configure(fg_color="#1e1e2d")
 
         # Título del Panel de Gráficos
-        self.label_title = ctk.CTkLabel(self, text="Panel de Gráficos", font=("Arial", 24, "bold"), text_color="white")
+        self.label_title = ctk.CTkLabel(
+            self, 
+            text="Panel de Gráficos", 
+            text_color="#4361ee",
+            font=("Arial", 24, "bold")
+        )
         self.label_title.pack(pady=20)
 
         # ComboBox para seleccionar el gráfico
@@ -1295,9 +1625,14 @@ class GraficosPanel(ctk.CTkFrame):
             self, 
             values=["Ventas por Fecha", "Menús más Comprados", "Uso de Ingredientes"],
             width=300, 
-            corner_radius=10
+            corner_radius=10,
+            fg_color="#4361ee",
+            button_color="#4361ee",
+            button_hover_color="#5a75f0",
+            dropdown_fg_color="#1e1e2d",
+            border_color="#4361ee"
         )
-        self.tipo_grafico.set("Selecciona un gráfico")  # Texto predeterminado
+        self.tipo_grafico.set("Selecciona un gráfico")
         self.tipo_grafico.pack(pady=10)
 
         # Botón para generar el gráfico
@@ -1305,7 +1640,9 @@ class GraficosPanel(ctk.CTkFrame):
             self,
             text="Generar Gráfico",
             command=self.generar_grafico,
-            corner_radius=10
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
         )
         self.bttn_generar_grafico.pack(pady=20)
 
