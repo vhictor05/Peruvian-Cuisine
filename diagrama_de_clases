@@ -1,4 +1,5 @@
 @startuml
+
 ' ==== SISTEMA PRINCIPAL ====
 class SistemaPrincipal {
   +casino: Casino
@@ -6,6 +7,9 @@ class SistemaPrincipal {
   +restaurante: Restaurante
   +elegir_servicio(tipo: str)
 }
+SistemaPrincipal o-- "1" Casino
+SistemaPrincipal o-- "1" Hotel
+SistemaPrincipal o-- "1" Restaurante
 
 ' ==== CASINO ====
 class Evento {
@@ -29,28 +33,42 @@ class Entrada {
   +id: int
   +cliente_id: int
   +evento_id: int
+  +fecha_compra: datetime
 }
 
-class Mesa {
+class Trago {
   +id: int
-  +numero: int
-  +capacidad: int
-  +disponible: bool
+  +nombre: str
+  +descripcion: str
+  +precio: float
 }
 
-class ReservaMesa {
+class PedidoBar {
   +id: int
   +cliente_id: int
-  +mesa_id: int
   +fecha: datetime
+  +total: float
 }
 
 class Casino {
   +eventos: List<Evento>
   +clientes: List<ClienteDiscoteca>
-  +mesas: List<Mesa>
-  +reservas: List<ReservaMesa>
+  +entradas: List<Entrada>
+  +tragos: List<Trago>
+  +pedidos_bar: List<PedidoBar>
 }
+
+Casino o-- "0..1" Evento
+Casino *-- "0..*" ClienteDiscoteca
+Casino *-- "0..*" Entrada
+Casino *-- "0..*" Trago
+Casino *-- "0..*" PedidoBar
+
+Entrada "*" --* "1" Evento
+Entrada "*" --* "1" ClienteDiscoteca
+
+PedidoBar "0..*" --* "1" ClienteDiscoteca
+PedidoBar "1" --o "1..*" Trago
 
 ' ==== HOTEL ====
 class Huesped {
@@ -59,6 +77,15 @@ class Huesped {
   +rut: str
   +email: str
   +telefono: str
+
+}
+
+class Reserva {
+  +id: int
+  +huesped_id: int
+  +fecha_entrada: date
+  +fecha_salida: date
+  +estado: str
 }
 
 class Habitacion {
@@ -69,35 +96,34 @@ class Habitacion {
   +disponible: bool
 }
 
-class Reserva {
-  +id: int
-  +huesped_id: int
+class DetalleReservaHabitacion {
+  +reserva_id: int
   +habitacion_id: int
-  +fecha_entrada: date
-  +fecha_salida: date
-  +estado: str
+  +notas: str
 }
 
 class Hotel {
   +huespedes: List<Huesped>
   +habitaciones: List<Habitacion>
   +reservas: List<Reserva>
+  +realizar_reserva(): void
+  +comprar_articulo(): void
 }
+
+Hotel *-- "0..*" Huesped
+Hotel *-- "1..*" Habitacion
+Hotel *-- "0..*" Reserva
+Reserva "*" --> "1" Huesped
+
+Reserva "*" --* "*" DetalleReservaHabitacion
+Habitacion "*" --* "*" DetalleReservaHabitacion
 
 
 ' ==== RESTAURANTE ====
 class Cliente {
-  +rut: str
-  +nombre: str
-  +email: str
-}
-
-class Ingrediente {
   +id: int
   +nombre: str
-  +tipo: str
-  +cantidad: float
-  +unidad: str
+  +email: str
 }
 
 class Menu {
@@ -105,12 +131,6 @@ class Menu {
   +nombre: str
   +descripcion: str
   +precio: float
-}
-
-class MenuIngrediente {
-  +menu_id: int
-  +ingrediente_id: int
-  +cantidad: float
 }
 
 class Pedido {
@@ -121,39 +141,48 @@ class Pedido {
   +fecha: datetime
 }
 
-class Restaurante {
-  +clientes: List<Cliente>
-  +ingredientes: List<Ingrediente>
-  +menus: List<Menu>
-  +pedidos: List<Pedido>
+class Mesa {
+  +id: int
+  +numero: int
+  +capacidad: int
+  +disponible: bool
 }
 
-' ==== RELACIONES SISTEMA PRINCIPAL (AGREGACIÓN) ====
-SistemaPrincipal o-- Casino
-SistemaPrincipal o-- Hotel
-SistemaPrincipal o-- Restaurante
+class ReservaRestaurante {
+  +id: int
+  +cliente_id: int
+  +fecha: datetime
+  +cantidad_personas: int
+}
 
-' ==== RELACIONES CASINO (COMPOSICIÓN + ASOCIACIONES) ====
-Casino o-- Evento
-Casino *-- ReservaMesa
-Entrada "*" --* "1" Evento
-ReservaMesa "*" --* "1" ClienteDiscoteca
-ReservaMesa "*" --* "1" Mesa
+class DetalleReservaMesa {
+  +reserva_id: int
+  +mesa_id: int
+  +comentario: str
+}
 
-' ==== RELACIONES HOTEL (COMPOSICIÓN + ASOCIACIONES) ====
-Hotel *-- Reserva
-Reserva "*" *-- "1" Huesped
-Reserva "*" --* "1" Habitacion
+class Restaurante {
+  +clientes: List<Cliente>
+  +Menu: List<Menu>
+  +pedidos: List<Pedido>
+  +reservas: List<ReservaRestaurante>
+  +mesas: List<Mesa>
+  +hacer_pedido(): void
+  +reservar_mesa(): void
+}
+Restaurante *-- "0..*" Cliente
+Restaurante *-- "0..*" Pedido
+Restaurante *-- "1..*" Menu
+Restaurante *-- "0..*" ReservaRestaurante
+Restaurante *-- "1..*" Mesa
 
-' ==== RELACIONES RESTAURANTE (COMPOSICIÓN + ASOCIACIONES) ====
+Pedido "1" --* "1" Cliente
+Pedido "1" --* "1..*" Menu
 
-Restaurante *-- Ingrediente
-Restaurante *-- Pedido
+ReservaRestaurante "*" --* "1" Cliente
+ReservaRestaurante "*" --* "*" DetalleReservaMesa
+Mesa "*" --* "*" DetalleReservaMesa
 
-MenuIngrediente "*" --* "*" Ingrediente
-MenuIngrediente "*" --* "*" Menu
-Pedido "*" --* "1" Cliente
-Pedido "*" --* "*" Menu
 
 @enduml
 
