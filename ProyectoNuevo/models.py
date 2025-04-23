@@ -51,32 +51,43 @@ class Pedido(Base):
 
 # MODELOS HOTEL
 class Habitacion(Base):
-    __tablename__ = 'habitaciones'
+    __tablename__ = "habitaciones"
     id = Column(Integer, primary_key=True)
     numero = Column(String(10), unique=True, nullable=False)
     tipo = Column(String(50), nullable=False)
     precio = Column(Float, nullable=False)
-    disponible = Column(Boolean, default=True)  
+    disponible = Column(Boolean, default=True)
+
+    # Relación con las reservas
+    reservas = relationship("Reserva", back_populates="habitacion")
 
 class Huesped(Base):
     __tablename__ = 'huespedes'
+    
     id = Column(Integer, primary_key=True)
     nombre = Column(String(100), nullable=False)
     rut = Column(String(12), unique=True, nullable=False)
     email = Column(String(100))
     telefono = Column(String(20))
+    
+    # Relación con las reservas (relación bidireccional con Reserva)
+    reservas = relationship("Reserva", back_populates="huesped")
+
 
 class Reserva(Base):
     __tablename__ = 'reservas'
+    
     id = Column(Integer, primary_key=True)
+    huesped_id = Column(Integer, ForeignKey('huespedes.id'), nullable=False)
+    habitacion_id = Column(Integer, ForeignKey('habitaciones.id'), nullable=False)
     fecha_entrada = Column(DateTime, nullable=False)
     fecha_salida = Column(DateTime, nullable=False)
-    huesped_id = Column(Integer, ForeignKey('huespedes.id'))
-    habitacion_id = Column(Integer, ForeignKey('habitaciones.id'))
-    estado = Column(String(20), default='Pendiente')
+    estado = Column(String, default="Confirmada")
     
-    huesped = relationship("Huesped")
-    habitacion = relationship("Habitacion")
+    # Relación con Huesped (relación bidireccional con Huesped)
+    huesped = relationship("Huesped", back_populates="reservas")
+    habitacion = relationship("Habitacion", back_populates="reservas")
+
 
 
 # MODELO DISCO

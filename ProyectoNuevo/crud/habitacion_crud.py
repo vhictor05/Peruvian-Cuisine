@@ -37,3 +37,8 @@ class HabitacionCRUD:
         habitacion.disponible = disponible
         db.commit()
         return habitacion
+    @staticmethod
+    def verificar_habitaciones_en_bd(db: Session):
+        habitaciones = db.query(Habitacion).all()
+        for habitacion in habitaciones:
+            print(f"ID: {habitacion.id}, Numero: {habitacion.numero}, Disponible: {habitacion.disponible}")
