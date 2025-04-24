@@ -1,0 +1,28 @@
+@startuml
+
+actor Usuario
+participant SistemaPrincipal
+participant IServicio
+participant IReservar
+participant IComprar
+
+
+
+== Selección del servicio ==
+Usuario -> SistemaPrincipal : elegir_servicio("hotel" | "restaurante" | "casino")
+SistemaPrincipal -> IServicio : mostrar_menu()
+IServicio --> SistemaPrincipal : menu_mostrado
+
+== Flujo de compra ==
+Usuario -> SistemaPrincipal : compra()
+SistemaPrincipal -> IServicio : OPT()
+IServicio -> IComprar : Efectua compra()
+IComprar--> SistemaPrincipal : regreso a interfaz principal
+
+== Flujo de reserva ==
+Usuario -> SistemaPrincipal  : reserva()
+SistemaPrincipal -> IServicio : OPT()
+IServicio -> IReservar : confirmacion_reserva()
+IReservar--> SistemaPrincipal : regreso a interfaz principal
+
+@enduml
