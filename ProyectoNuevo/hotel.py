@@ -133,6 +133,64 @@ class HotelApp(ctk.CTk):
         self.main_frame.columnconfigure(1, weight=1)
         self.main_frame.rowconfigure(1, weight=1)
 
+        # Llamar al método para actualizar la lista de huéspedes
+        self.actualizar_lista_huespedes()
+
+    # ===== MÉTODOS AUXILIARES =====
+    def registrar_huesped(self):
+        nombre = self.huesped_nombre.get()
+        rut = self.huesped_rut.get()
+        
+        if not nombre or not rut:
+            messagebox.showerror("Error", "Nombre y RUT son obligatorios")
+            return
+            
+        try:
+            HuespedCRUD.crear_huesped(
+                self.db,
+                nombre=nombre,
+                rut=rut,
+                email=self.huesped_email.get() or None,
+                telefono=self.huesped_telefono.get() or None
+            )
+            messagebox.showinfo("Éxito", "Huésped registrado correctamente")
+            self.actualizar_lista_huespedes()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo registrar: {str(e)}")
+
+    def actualizar_lista_huespedes(self):
+        for item in self.huesped_tree.get_children():
+            self.huesped_tree.delete(item)
+            
+        huespedes = self.db.query(Huesped).all()
+        for huesped in huespedes:
+            self.huesped_tree.insert("", "end", values=(
+                huesped.id,
+                huesped.nombre,
+                huesped.rut,
+                huesped.email or "",
+                huesped.telefono or ""
+            ))
+
+    def buscar_huesped(self):
+        rut = self.huesped_rut.get()
+        if not rut:
+            messagebox.showwarning("Advertencia", "Ingrese un RUT para buscar")
+            return
+            
+        huesped = HuespedCRUD.obtener_huesped_por_rut(self.db, rut)
+        if huesped:
+            self.huesped_nombre.delete(0, "end")
+            self.huesped_nombre.insert(0, huesped.nombre)
+            self.huesped_email.delete(0, "end")
+            if huesped.email:
+                self.huesped_email.insert(0, huesped.email)
+            self.huesped_telefono.delete(0, "end")
+            if huesped.telefono:
+                self.huesped_telefono.insert(0, huesped.telefono)
+        else:
+            messagebox.showinfo("Información", "No se encontró el huésped")
+    
     # ===== PANEL HABITACIONES =====
     def show_habitaciones(self):
         self.clear_main_frame()
@@ -209,6 +267,98 @@ class HotelApp(ctk.CTk):
         # Configurar las columnas del main_frame para que la tabla se expanda
         self.main_frame.columnconfigure(1, weight=1)
         self.main_frame.rowconfigure(1, weight=1)
+
+        # Llamar al método para actualizar la lista de habitaciones
+        self.actualizar_lista_habitaciones()
+
+    def registrar_habitacion(self):
+        # Obtener los valores ingresados en los campos
+        numero = self.habitacion_numero.get()
+        tipo = self.habitacion_tipo.get()
+        precio = self.habitacion_precio.get()
+
+        # Validar que todos los campos estén completos
+        if not numero or not tipo or not precio:
+            messagebox.showerror("Error", "Todos los campos son obligatorios")
+            return
+
+        try:
+            precio = float(precio)  # Convertir el precio a tipo flotante
+            HabitacionCRUD.crear_habitacion(
+                self.db, 
+                numero=numero, 
+                tipo=tipo, 
+                precio=precio
+            )
+            messagebox.showinfo("Éxito", "Habitación registrada correctamente")
+            self.actualizar_lista_habitaciones()  # Actualizar la lista de habitaciones
+        except ValueError:
+            messagebox.showerror("Error", "Precio debe ser un número válido")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo registrar la habitación: {str(e)}")
+
+    def modificar_habitacion(self):
+        # Obtener la habitación seleccionada en el TreeView
+        selected_item = self.habitacion_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione una habitación para modificar")
+            return
+
+        # Obtener los valores de la habitación seleccionada
+        habitacion_id = self.habitacion_tree.item(selected_item, "values")[0]
+
+        # Obtener los nuevos valores del formulario
+        numero = self.habitacion_numero.get()
+        tipo = self.habitacion_tipo.get()
+        precio = self.habitacion_precio.get()
+        disponible = messagebox.askyesno("Disponibilidad", "¿Está disponible esta habitación?")
+
+        if not all([numero, tipo, precio]):
+            messagebox.showerror("Error", "Todos los campos son obligatorios")
+            return
+
+        try:
+            precio = float(precio)  # Convertir el precio a tipo flotante
+            HabitacionCRUD.modificar_habitacion(
+                self.db,
+                habitacion_id=habitacion_id,
+                numero=numero,
+                tipo=tipo,
+                precio=precio,
+                disponible=disponible
+            )
+            messagebox.showinfo("Éxito", "Habitación modificada correctamente")
+            self.actualizar_lista_habitaciones()  # Actualizar la lista de habitaciones
+        except ValueError:
+            messagebox.showerror("Error", "Precio debe ser un número válido")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo modificar la habitación: {str(e)}")
+
+    def actualizar_lista_habitaciones(self):
+        # Verificar si el TreeView está disponible
+        if not hasattr(self, 'habitacion_tree') or not self.habitacion_tree.winfo_exists():
+            print("El TreeView de habitaciones no está disponible o ha sido destruido.")
+            return  # Evita errores si el TreeView no existe
+        
+        # Limpiar los elementos del TreeView
+        for item in self.habitacion_tree.get_children():
+            self.habitacion_tree.delete(item)
+        
+        # Obtener todas las habitaciones de la base de datos
+        habitaciones = self.db.query(Habitacion).all()
+        if not habitaciones:
+            print("No se encontraron habitaciones en la base de datos.")
+        
+        # Insertar cada habitación en el TreeView
+        for hab in habitaciones:
+            print(f"Insertando habitación: {hab.id}, {hab.numero}, {hab.tipo}")
+            self.habitacion_tree.insert("", "end", values=(
+                hab.id,
+                hab.numero,
+                hab.tipo,
+                f"${hab.precio:.2f}",
+                "Sí" if hab.disponible else "No"
+            ))
 
     # ===== PANEL RESERVAS =====
     def show_reservas(self):
@@ -294,6 +444,9 @@ class HotelApp(ctk.CTk):
         # Configurar las columnas del main_frame para que la tabla se expanda
         self.main_frame.columnconfigure(1, weight=1)
         self.main_frame.rowconfigure(1, weight=1)
+
+        # Llamar al método para actualizar la lista de reservas
+        self.actualizar_lista_reservas()
     
     # Función que obtiene los huéspedes para el combobox, asegurándonos de que devuelvan tanto el nombre como el rut
     def obtener_huespedes_combobox(self):
@@ -322,14 +475,8 @@ class HotelApp(ctk.CTk):
         # Insertar cada reserva en el TreeView
         for res in reservas:
             print(f"Insertando reserva: {res.id}, {res.huesped.nombre}, {res.habitacion.numero}")
-            self.reserva_tree.insert("", "end", values=(
-                res.id,
-                res.huesped.nombre,
-                res.habitacion.numero,
-                res.fecha_entrada.strftime("%Y-%m-%d"),
-                res.fecha_salida.strftime("%Y-%m-%d"),
-                res.estado
-            ))
+            self.reserva_tree.insert("", "end", values=(res.id, res.huesped.nombre, res.habitacion.numero, res.fecha_entrada.strftime("%Y-%m-%d"), res.fecha_salida.strftime("%Y-%m-%d"), res.estado))
+
 
     # Al momento de crear la reserva, extraemos el rut
     def crear_reserva(self):
@@ -415,146 +562,6 @@ class HotelApp(ctk.CTk):
             self.actualizar_lista_reservas()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo eliminar la reserva: {str(e)}")
-
-    # ===== MÉTODOS AUXILIARES =====
-    def create_form_entry(self, parent, label, row):
-        frame = ctk.CTkFrame(parent, height=40)
-        frame.grid(row=row, column=0, sticky="ew", pady=5)
-        
-        ctk.CTkLabel(frame, text=label + ":", width=80).pack(side="left", padx=5)
-        entry = ctk.CTkEntry(frame)
-        entry.pack(side="right", fill="x", expand=True, padx=5)
-        
-        return entry
-
-    def actualizar_lista_huespedes(self):
-        for item in self.huesped_tree.get_children():
-            self.huesped_tree.delete(item)
-            
-        huespedes = self.db.query(Huesped).all()
-        for huesped in huespedes:
-            self.huesped_tree.insert("", "end", values=(
-                huesped.id,
-                huesped.nombre,
-                huesped.rut,
-                huesped.email or "",
-                huesped.telefono or ""
-            ))
-
-    def actualizar_lista_habitaciones(self):
-        for item in self.habitacion_tree.get_children():
-            self.habitacion_tree.delete(item)
-            
-        habitaciones = self.db.query(Habitacion).all()
-        for hab in habitaciones:
-            self.habitacion_tree.insert("", "end", values=(
-                hab.id,
-                hab.numero,
-                hab.tipo,
-                f"${hab.precio:.2f}",
-                "Sí" if hab.disponible else "No"
-            ))
-
-    def registrar_huesped(self):
-        nombre = self.huesped_nombre.get()
-        rut = self.huesped_rut.get()
-        
-        if not nombre or not rut:
-            messagebox.showerror("Error", "Nombre y RUT son obligatorios")
-            return
-            
-        try:
-            HuespedCRUD.crear_huesped(
-                self.db,
-                nombre=nombre,
-                rut=rut,
-                email=self.huesped_email.get() or None,
-                telefono=self.huesped_telefono.get() or None
-            )
-            messagebox.showinfo("Éxito", "Huésped registrado correctamente")
-            self.actualizar_lista_huespedes()
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar: {str(e)}")
-
-    def buscar_huesped(self):
-        rut = self.huesped_rut.get()
-        if not rut:
-            messagebox.showwarning("Advertencia", "Ingrese un RUT para buscar")
-            return
-            
-        huesped = HuespedCRUD.obtener_huesped_por_rut(self.db, rut)
-        if huesped:
-            self.huesped_nombre.delete(0, "end")
-            self.huesped_nombre.insert(0, huesped.nombre)
-            self.huesped_email.delete(0, "end")
-            if huesped.email:
-                self.huesped_email.insert(0, huesped.email)
-            self.huesped_telefono.delete(0, "end")
-            if huesped.telefono:
-                self.huesped_telefono.insert(0, huesped.telefono)
-        else:
-            messagebox.showinfo("Información", "No se encontró el huésped")
-
-    def registrar_habitacion(self):
-        numero = self.habitacion_numero.get()
-        tipo = self.habitacion_tipo.get().strip().capitalize()
-        precio = self.habitacion_precio.get()
-        
-        if not all([numero, tipo, precio]):
-            messagebox.showerror("Error", "Todos los campos son obligatorios")
-            return
-            
-        try:
-            precio = float(precio)
-            HabitacionCRUD.crear_habitacion(
-                self.db,
-                numero=numero,
-                tipo=tipo,
-                precio=precio
-            )
-            messagebox.showinfo("Éxito", "Habitación registrada")
-            self.actualizar_lista_habitaciones()
-        except ValueError:
-            messagebox.showerror("Error", "Precio debe ser un número válido")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar la habitación: {str(e)}")
-
-    def modificar_habitacion(self):
-        # Obtener la habitación seleccionada en el TreeView
-        selected_item = self.habitacion_tree.selection()
-        if not selected_item:
-            messagebox.showwarning("Advertencia", "Seleccione una habitación para modificar")
-            return
-
-        # Obtener los valores de la habitación seleccionada
-        habitacion_id = self.habitacion_tree.item(selected_item, "values")[0]
-
-        # Obtener los nuevos valores del formulario
-        numero = self.habitacion_numero.get()
-        tipo = self.habitacion_tipo.get()
-        precio = self.habitacion_precio.get()
-        disponible = messagebox.askyesno("Disponibilidad", "¿Está disponible esta habitación?")
-
-        if not all([numero, tipo, precio]):
-            messagebox.showerror("Error", "Todos los campos son obligatorios")
-            return
-
-        try:
-            precio = float(precio)
-            HabitacionCRUD.modificar_habitacion(
-                self.db,
-                habitacion_id=habitacion_id,
-                numero=numero,
-                tipo=tipo,
-                precio=precio,
-                disponible=disponible
-            )
-            messagebox.showinfo("Éxito", "Habitación modificada correctamente")
-            self.actualizar_lista_habitaciones()
-        except ValueError:
-            messagebox.showerror("Error", "Precio debe ser un número válido")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo modificar la habitación: {str(e)}")
 
 if __name__ == "__main__":
     app = HotelApp()
