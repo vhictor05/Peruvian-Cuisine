@@ -21,34 +21,56 @@ class DiscotecaApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Discoteca")
-        self.geometry("1200x700")
+        self.geometry("870x600")
         self.configure(fg_color="#1e1e2d")
         self.db: Session = next(get_db())
 
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-        # Frame secundario
+        # Frame para el título DISCO MANAGER
+        self.title_frame = ctk.CTkFrame(
+            self,
+            fg_color="#1e1e2d",
+            corner_radius=0
+        )
+        self.title_frame.grid(row=0, column=0, pady="65", sticky="ew"
+        )
+
+        # Título DISCO MANAGER
+        ctk.CTkLabel(
+            self.title_frame,
+            text="DISCO",
+            font=("Arial", 27, "bold"),
+            text_color="#7209b7"
+        ).pack(pady=0, padx=(20,0), anchor="w")  # Añadido padx y anchor="w" (texto a la izquierda)
+
+        ctk.CTkLabel(
+            self.title_frame,
+            text="MANAGER",
+            font=("Arial", 23),  
+            text_color="#9d4dc7"
+        ).pack(pady=0, padx=(20,0), anchor="w")  # Añadido padx y anchor="w" (texto a la izquierda)
+
+        # Frame secundario(lateral): Entrada, Clientes y Tragos
         self.menu_frame = ctk.CTkFrame(
             self,
             fg_color="#25253a", 
-            corner_radius=0
-        )
-        self.menu_frame.pack(
-            side="right", 
-            fill="y"
-        )
-
-        # Frame principal
-        self.main_frame = ctk.CTkFrame(
-            self, fg_color="#25253a", 
             corner_radius=15
         )
-        self.main_frame.pack(
-            side="left", 
-            fill="both", 
-            expand=True, 
-            padx=20, 
-            pady=20)
+        self.menu_frame.grid(row=1, column=0, sticky="ns", padx=20, pady=20
+        )
+        
+        # Frame principal: Gestión de Eventos, Gestión de Clientes y Gestión de Tragos
+        self.main_frame = ctk.CTkFrame(
+            self, 
+            fg_color="#25253a", 
+            corner_radius=15
+        )
+        self.main_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=20, pady=20)
+
+        # Configurar el peso de las columnas y filas
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         # Crear botones en el frame secundario
         self.create_menu_button("Eventos", self.show_eventos)
@@ -57,7 +79,7 @@ class DiscotecaApp(ctk.CTk):
         TragoCRUD.inicializar_tragos(self.db)
 
         self.show_eventos()
-
+    
     def on_closing(self):
         try:
             self.destroy()
@@ -69,19 +91,20 @@ class DiscotecaApp(ctk.CTk):
             self.menu_frame,
             text=text,
             command=command,
-            fg_color="#7209b7",  # Color principal del botón
-            hover_color="#9d4dc7",  # Color más claro para el hover
-            font=("Arial", 20),  # Fuente personalizada
-            corner_radius=50,  # Bordes redondeados
-            width=200,  # Ancho del botón
-            height=50  # Alto del botón
+            fg_color="#25253a",     
+            hover_color="#9d4dc7",  
+            font=("Arial", 20),     
+            corner_radius=0,       
+            width=200,              
+            height=50,
+            anchor="w"  # Alinear el texto a la izquierda
         )
-        btn.pack(side="top", padx=20, pady=40)  # Espaciado mejorado
+        btn.pack(side="top", pady=10, padx=(20,0))  # Añadir padding izquierdo
         
     def clear_main_frame(self):
         for widget in self.main_frame.winfo_children():
             widget.destroy()
-
+    
     def create_form_entry(self, parent, label, row):
         frame = ctk.CTkFrame(
             parent, 
@@ -125,69 +148,159 @@ class DiscotecaApp(ctk.CTk):
         ).pack(pady=20)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
+        form_frame = ctk.CTkFrame(
+            self.main_frame, 
+            fg_color="#1e1e2d", 
+            corner_radius=15
+        )
         form_frame.pack(fill="x", padx=30, pady=20)
 
-        # Campos del formulario organizados con grid()
-        ctk.CTkLabel(form_frame, text="Nombre:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.evento_nombre = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#7209b7", border_width=2)
-        self.evento_nombre.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        # Campo Nombre
+        ctk.CTkLabel(
+            form_frame, 
+            text="Nombre:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=0, padx=10, pady=(5,0), sticky="w")
 
-        ctk.CTkLabel(form_frame, text="Descripción:", font=("Arial", 14)).grid(row=0, column=2, padx=10, pady=10, sticky="w")
-        self.evento_descripcion = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#7209b7", border_width=2)
-        self.evento_descripcion.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
+        self.evento_nombre = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=2
+        )
+        self.evento_nombre.grid(row=1, column=0, columnspan=2, padx=10, sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="Precio Entrada:", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=10, sticky="w")
-        self.evento_precio = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#7209b7", border_width=2)
-        self.evento_precio.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+        # Campo Descripción
+        ctk.CTkLabel(
+            form_frame, 
+            text="Descripción:", 
+            font=("Arial", 14)
+        ).grid(row=2, column=0, padx=10, pady=(5,0), sticky="w")
 
-        ctk.CTkLabel(form_frame, text="Aforo Máximo:", font=("Arial", 14)).grid(row=1, column=2, padx=10, pady=10, sticky="w")
-        self.evento_aforo = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#7209b7", border_width=2)
-        self.evento_aforo.grid(row=1, column=3, padx=10, pady=10, sticky="ew")
+        self.evento_descripcion = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=2
+        )
+        self.evento_descripcion.grid(row=3, column=0, columnspan=2, padx=10, sticky="ew")
 
-        # Configurar las columnas para que las entradas se expandan
-        form_frame.columnconfigure(1, weight=1)
-        form_frame.columnconfigure(3, weight=1)
+        # Configurar el peso de las columnas
+        form_frame.grid_columnconfigure(0, weight=1)
+        form_frame.grid_columnconfigure(1, weight=1)
 
-        # Frame para fecha y hora
-        fecha_frame = ctk.CTkFrame(form_frame, fg_color="#1e1e2d")
-        fecha_frame.grid(row=2, column=0, columnspan=4, sticky="ew", pady=10, padx=10)
+        # Campo Precio Entrada
+        ctk.CTkLabel(
+            form_frame, 
+            text="Precio Entrada:", 
+            font=("Arial", 14)
+        ).grid(row=4, column=0, padx=10, pady=(5,0), sticky="w")
 
-        ctk.CTkLabel(fecha_frame, text="Fecha:", font=("Arial", 14)).pack(side="left", padx=10)
+        self.evento_precio = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=2
+        )
+        self.evento_precio.grid(row=5, column=0, padx=10, sticky="ew")
+
+        # Campo Aforo Máximo (a la derecha de Precio Entrada)
+        ctk.CTkLabel(
+            form_frame, 
+            text="Aforo Máximo:", 
+            font=("Arial", 14)
+        ).grid(row=4, column=1, padx=10, pady=(5,0), sticky="w")
+
+        self.evento_aforo = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=2
+        )
+        self.evento_aforo.grid(row=5, column=1, padx=10, sticky="ew")
+
+        # Fecha (debajo de Precio Entrada)
+        ctk.CTkLabel(
+            form_frame, 
+            text="Fecha:", 
+            font=("Arial", 14)
+        ).grid(row=6, column=0, padx=10, pady=(5,0), sticky="w")
+
         self.cal = DateEntry(
-            fecha_frame,
+            form_frame,
             date_pattern="yyyy-mm-dd",
             width=12,
-            background="darkblue",
+            background="#7209b7",
             foreground="white",
             borderwidth=2
         )
-        self.cal.pack(side="left", padx=10)
+        self.cal.grid(row=7, column=0, padx=10, pady=(0, 10), sticky="w")
 
-        # Selector de hora
-        hora_frame = ctk.CTkFrame(fecha_frame, fg_color="#1e1e2d")
-        hora_frame.pack(side="left", padx=10)
+        # Hora (debajo de Aforo Máximo)
+        ctk.CTkLabel(
+            form_frame, 
+            text="Hora:", 
+            font=("Arial", 14)
+        ).grid(row=6, column=1, padx=10, pady=(5,0), sticky="w")
 
-        ctk.CTkLabel(hora_frame, text="Hora:", font=("Arial", 14)).pack(side="left")
+        hora_frame = ctk.CTkFrame(form_frame, fg_color="#1e1e2d")
+        hora_frame.grid(row=7, column=1, padx=10, pady=(0,10), sticky="w")
+
         self.hora_spinbox = ttk.Spinbox(hora_frame, from_=0, to=23, width=2, format="%02.0f")
         self.hora_spinbox.pack(side="left", padx=5)
         self.hora_spinbox.set("20")
 
         ctk.CTkLabel(hora_frame, text=":", font=("Arial", 14)).pack(side="left")
+
         self.minuto_spinbox = ttk.Spinbox(hora_frame, from_=0, to=59, width=2, format="%02.0f")
         self.minuto_spinbox.pack(side="left", padx=5)
         self.minuto_spinbox.set("00")
 
+        # Frame para botones
+        button_frame = ctk.CTkFrame(
+            self.main_frame,
+            fg_color="transparent"
+        )
+        button_frame.pack(pady=10)
+
         # Botón para registrar evento
         ctk.CTkButton(
-            self.main_frame,
-            text="Registrar Evento",
+            button_frame,
+            text="📄 Registrar Evento",
             command=self.registrar_evento,
             fg_color="#7209b7",
             hover_color="#9d4dc7",
-            font=("Arial", 16),
-            corner_radius=50
-        ).pack(pady=10)
+            font=("Arial", 14),
+            corner_radius=15,
+            height=40,
+            width=150
+        ).pack(side="left", padx=5)
+
+        # Botón para editar evento
+        ctk.CTkButton(
+            button_frame,
+            text="🖊 Editar Evento",
+            # Poner aqui su command
+            fg_color="#7209b7",
+            hover_color="#9d4dc7",
+            font=("Arial", 14),
+            corner_radius=15,
+            height=40,
+            width=150
+        ).pack(side="left", padx=5)
+
+        # Botón para eliminar evento
+        ctk.CTkButton(
+            button_frame,
+            text="🗑 Eliminar Evento",
+            # Poner aqui su command
+            fg_color="#7209b7",
+            hover_color="#9d4dc7",
+            font=("Arial", 14),
+            corner_radius=15,
+            height=40,
+            width=150
+        ).pack(side="left", padx=5)
 
         # Tabla de eventos
         self.evento_tree = self.create_treeview(["ID", "Nombre", "Fecha", "Precio", "Aforo"])
@@ -241,38 +354,88 @@ class DiscotecaApp(ctk.CTk):
         ).pack(pady=10)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
+        form_frame = ctk.CTkFrame(
+            self.main_frame, 
+            fg_color="#1e1e2d", 
+            corner_radius=15)
         form_frame.pack(fill="x", padx=20, pady=10)
 
         # Campos del formulario organizados con grid()
-        ctk.CTkLabel(form_frame, text="Nombre:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.cliente_nombre = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#7209b7", border_width=2)
-        self.cliente_nombre.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
-
-        ctk.CTkLabel(form_frame, text="RUT:", font=("Arial", 14)).grid(row=0, column=2, padx=10, pady=10, sticky="w")
-        self.cliente_rut = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#7209b7", border_width=2)
-        self.cliente_rut.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
-
-        ctk.CTkLabel(form_frame, text="Email:", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=10, sticky="w")
-        self.cliente_email = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#7209b7", border_width=2)
-        self.cliente_email.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
-
-        ctk.CTkLabel(form_frame, text="Teléfono:", font=("Arial", 14)).grid(row=1, column=2, padx=10, pady=10, sticky="w")
-        self.cliente_telefono = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#7209b7", border_width=2)
-        self.cliente_telefono.grid(row=1, column=3, padx=10, pady=10, sticky="ew")
+        # Entry del Nombre
+        ctk.CTkLabel(
+            form_frame, 
+            text="Nombre:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=0, padx=10, pady=(10,0), sticky="w")
+        
+        self.cliente_nombre = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=2
+        )
+        self.cliente_nombre.grid(row=1, column=0, padx=10, sticky="ew")
+        
+        # Entry del RUT
+        ctk.CTkLabel(
+            form_frame, 
+            text="RUT:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=1, padx=10, pady=(10,0), sticky="w")
+        
+        self.cliente_rut = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=2
+        )
+        self.cliente_rut.grid(row=1, column=1, padx=10, sticky="ew")
+        
+        # Entry del Email
+        ctk.CTkLabel(
+            form_frame, 
+            text="Email:", 
+            font=("Arial", 14)
+        ).grid(row=2, column=0, padx=10, pady=(5,0), sticky="w")
+        
+        self.cliente_email = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=2
+        )
+        self.cliente_email.grid(row=3, column=0, padx=10, pady=(0,10), sticky="ew")
+        
+        # Entry del Teléfono
+        ctk.CTkLabel(
+            form_frame, 
+            text="Teléfono:", 
+            font=("Arial", 14)
+        ).grid(row=2, column=1, padx=10, pady=(5,0), sticky="w")
+        
+        self.cliente_telefono = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=2
+        )
+        self.cliente_telefono.grid(row=3, column=1, padx=10, pady=(0, 10), sticky="ew")
 
         # Configurar las columnas para que las entradas se expandan
+        form_frame.columnconfigure(0, weight=1)
         form_frame.columnconfigure(1, weight=1)
-        form_frame.columnconfigure(3, weight=1)
 
         # Botón para registrar cliente
         ctk.CTkButton(
             self.main_frame,
-            text="Registrar Cliente",
+            text="📄 Registrar Cliente",
             fg_color="#7209b7",
             hover_color="#9d4dc7",
             command=self.registrar_cliente,
-            corner_radius=50
+            corner_radius=15,
+            font=("Arial", 14),
+            height=40,
+            width=150
         ).pack(pady=10)
 
         # Tabla de clientes
@@ -302,7 +465,7 @@ class DiscotecaApp(ctk.CTk):
         tree = ttk.Treeview(self.main_frame, columns=columns, show="headings")
         for col in columns:
             tree.heading(col, text=col)
-            tree.column(col, width=120)
+            tree.column(col, width=100)  # Ajustar el ancho de la columna según sea necesario
         tree.pack(fill="both", expand=True, padx=20, pady=10)
         return tree
     
@@ -320,7 +483,14 @@ class DiscotecaApp(ctk.CTk):
             ).pack(pady=10)
             
             # Pestañas
-            tabview = ctk.CTkTabview(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
+            tabview = ctk.CTkTabview(
+                self.main_frame, 
+                fg_color="#1e1e2d", 
+                corner_radius=15,
+                segmented_button_fg_color="#1e1e2d",        # Color de fondo de los botones
+                segmented_button_selected_color="#7209b7",   # Color cuando está seleccionado
+                segmented_button_selected_hover_color="#9d4dc7"  # Color hover cuando está seleccionado
+            )
             tabview.pack(fill="both", expand=True, padx=20, pady=10)
             
             tabview.add("Registro")
@@ -337,14 +507,36 @@ class DiscotecaApp(ctk.CTk):
         form_frame.pack(fill="x", padx=10, pady=10)
 
         # Combobox para seleccionar trago existente
-        ctk.CTkLabel(form_frame, text="Seleccionar Trago:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.trago_seleccionado = ctk.CTkComboBox(form_frame, state="readonly")
-        self.trago_seleccionado.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(
+            form_frame, 
+            text="Seleccionar Trago:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=0, padx=10, pady=(10,0), sticky="w")
 
-        # Campo para modificar precio (a la derecha de "Seleccionar Trago")
-        ctk.CTkLabel(form_frame, text="Precio:", font=("Arial", 14)).grid(row=0, column=2, padx=10, pady=10, sticky="w")
-        self.trago_precio = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#7209b7", border_width=2)
-        self.trago_precio.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
+        # Label de Precio (en la misma fila que el label de Seleccionar Trago)
+        ctk.CTkLabel(
+            form_frame, 
+            text="Precio:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=1, padx=10, pady=(10,0), sticky="w")
+        
+        # Combobox debajo de su label
+        self.trago_seleccionado = ctk.CTkComboBox(
+            form_frame, 
+            border_color="#7209b7", 
+            fg_color="#25253a",
+            state="readonly"
+        )
+        self.trago_seleccionado.grid(row=1, column=0, padx=10, pady=(5,10), sticky="ew")
+
+        # Entry de precio debajo de su label
+        self.trago_precio = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=2
+        )
+        self.trago_precio.grid(row=1, column=1, padx=10, pady=(5,10), sticky="ew")
 
         # Checkbox para disponibilidad
         self.trago_disponible = ctk.CTkCheckBox(
@@ -354,7 +546,7 @@ class DiscotecaApp(ctk.CTk):
             hover_color="#9d4dc7"
         )
         self.trago_disponible.grid(
-            row=1, 
+            row=4, 
             column=0, 
             columnspan=2, 
             padx=10, 
@@ -372,7 +564,10 @@ class DiscotecaApp(ctk.CTk):
             command=self.actualizar_precio_trago,
             fg_color="#7209b7",
             hover_color="#9d4dc7",
-            corner_radius=50
+            corner_radius=15,
+            font=("Arial", 14),
+            height=40,
+            width=150
         ).pack(side="left", padx=5)
 
         ctk.CTkButton(
@@ -381,7 +576,10 @@ class DiscotecaApp(ctk.CTk):
             command=self.cambiar_disponibilidad_trago,
             fg_color="#7209b7",
             hover_color="#9d4dc7",
-            corner_radius=50
+            corner_radius=15,
+            font=("Arial", 14),
+            height=40,
+            width=150
         ).pack(side="left", padx=10)
 
         # Actualizar lista de tragos
@@ -415,18 +613,27 @@ class DiscotecaApp(ctk.CTk):
         cliente_frame.pack(fill="x", padx=10, pady=(0, 10))
 
         # Búsqueda de cliente
-        ctk.CTkLabel(cliente_frame, text="Buscar Cliente:").grid(row=0, column=0, padx=5, pady=5)
+        ctk.CTkLabel(
+            cliente_frame, 
+            text="Buscar Cliente:",
+            font=("Arial", 14)
+        ).grid(row=0, column=0, padx=5, pady=5)
         self.busqueda_cliente = ctk.CTkEntry(
             cliente_frame,
-            fg_color="#1e1e2d",  # Fondo interno del cuadro
+            fg_color="#25253a",  # Fondo interno del cuadro
             border_color="#7209b7",  # Color del borde
-            border_width=2  # Ancho del borde
+            border_width=2,  # Ancho del borde
         )
         self.busqueda_cliente.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.busqueda_cliente.bind("<KeyRelease>", self.filtrar_clientes)
 
         # Combobox de clientes filtrados
-        self.lista_clientes = ctk.CTkComboBox(cliente_frame, state="readonly")
+        self.lista_clientes = ctk.CTkComboBox(
+            cliente_frame, 
+            border_color="#7209b7", 
+            fg_color="#25253a",
+            state="readonly"
+        )
         self.lista_clientes.grid(row=0, column=2, columnspan=2, padx=5, pady=5, sticky="ew")
         self.actualizar_lista_clientes_combo()
 
@@ -441,14 +648,18 @@ class DiscotecaApp(ctk.CTk):
         self.cliente_seleccionado_label.pack(pady=5)
 
         # Frame para agregar tragos
-        tragos_frame = ctk.CTkFrame(tab, fg_color="#25253e", corner_radius=15)
+        tragos_frame = ctk.CTkFrame(tab, fg_color="#25253a", corner_radius=15)
         tragos_frame.pack(fill="x", padx=10, pady=10)
 
         # Búsqueda de tragos
-        ctk.CTkLabel(tragos_frame, text="Buscar Trago:").grid(row=0, column=0, padx=5, pady=5)
+        ctk.CTkLabel(
+            tragos_frame, 
+            text="Buscar Trago:",
+            font=("Arial", 14)
+        ).grid(row=0, column=0, padx=5, pady=5)
         self.busqueda_trago = ctk.CTkEntry(
             tragos_frame,
-            fg_color="#1e1e2d",  # Fondo interno del cuadro
+            fg_color="#25253a",  # Fondo interno del cuadro
             border_color="#7209b7",  # Color del borde
             border_width=2  # Ancho del borde
         )
@@ -456,13 +667,28 @@ class DiscotecaApp(ctk.CTk):
         self.busqueda_trago.bind("<KeyRelease>", self.filtrar_tragos)
 
         # Combobox de tragos filtrados
-        self.lista_tragos = ctk.CTkComboBox(tragos_frame, state="readonly")
+        self.lista_tragos = ctk.CTkComboBox(
+            tragos_frame, 
+            border_color="#7209b7",
+            fg_color="#25253a",  # Fondo interno del cuadro
+            state="readonly"
+        )
         self.lista_tragos.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
         self.actualizar_lista_tragos_combo()
 
         # Cantidad
-        ctk.CTkLabel(tragos_frame, text="Cantidad:").grid(row=1, column=0, padx=5, pady=5)
-        self.trago_cantidad = ctk.CTkEntry(tragos_frame, width=60)
+        ctk.CTkLabel(
+            tragos_frame, 
+            text="Cantidad:",
+            font=("Arial", 14)
+        ).grid(row=1, column=0, padx=5, pady=5)
+        self.trago_cantidad = ctk.CTkEntry(
+            tragos_frame, 
+            width=140,
+            border_color="#7209b7",  # Color del borde
+            border_width=2,
+            fg_color="#25253a"
+        )
         self.trago_cantidad.grid(row=1, column=1, padx=5, pady=5)
         self.trago_cantidad.insert(0, "1")
 
@@ -488,7 +714,7 @@ class DiscotecaApp(ctk.CTk):
         )
         
         # Configurar columnas
-        col_widths = [150, 80, 120, 100, 40]
+        col_widths = [150, 60, 120, 100, 40]
         for col, width in zip(columns, col_widths):
             self.pedido_tree.heading(col, text=col)
             self.pedido_tree.column(col, width=width, anchor="center")
