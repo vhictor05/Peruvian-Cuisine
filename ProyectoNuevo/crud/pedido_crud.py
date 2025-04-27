@@ -1,7 +1,7 @@
 import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from models import Pedido, Cliente, Ingrediente, Menu
+from models_folder.models_restaurente import Pedido, Cliente, Ingrediente, Menu
 from crud.menu_crud import MenuCRUD
 
 class PedidoCRUD:

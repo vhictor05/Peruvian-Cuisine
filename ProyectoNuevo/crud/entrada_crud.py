@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import Entrada
+from models_folder.models_disco import Entrada
 from typing import Optional
 from datetime import datetime
 

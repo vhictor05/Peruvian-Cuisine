@@ -2,17 +2,20 @@ import customtkinter as ctk
 from tkinter import messagebox, ttk
 from datetime import datetime
 from sqlalchemy.orm import Session
-from hotel_database import get_db, Base, recreate_db
-from models import Huesped, Habitacion, Reserva
+from hotel_database import get_db, Base, recreate_db, engine
+from models_folder.models_hotel import Huesped, Habitacion, Reserva
 from crud.huesped_crud import HuespedCRUD
 from crud.habitacion_crud import HabitacionCRUD
 from crud.reserva_crud import ReservaCRUD
 from datetime import datetime, timedelta
 from tkcalendar import DateEntry
 
-# recreate_db()  # Recreate the database with the new schema
+recreate_db()  # Recreate the database with the new schema
+Base.metadata.create_all(bind=engine)
+
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+
 
 class HotelApp(ctk.CTk):
     def __init__(self):
