@@ -25,6 +25,28 @@ class DiscotecaApp(ctk.CTk):
         self.configure(fg_color="#1e1e2d")
         self.db: Session = next(get_db())
 
+        # Configurar el estilo del Treeview al inicio
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Treeview", 
+            background="#1e1e2d",          # Color de fondo para las filas
+            foreground="white",            # Color del texto
+            fieldbackground="#1e1e2d",     # Color de fondo para el área de datos
+            bordercolor="#3b3b3b",
+            borderwidth=0
+        )
+        # Color para la cabecera (nombres de columnas)
+        style.configure("Treeview.Heading",
+            background="#1e1e2d",         # Color de fondo de la cabecera
+            foreground="white",           # Color del texto de la cabecera
+            borderwidth=1
+        )
+        # Color cuando se selecciona una fila
+        style.map('Treeview', 
+            background=[('selected', '#7209b7')],     # Color morado cuando se selecciona
+            foreground=[('selected', 'white')]        # Color del texto cuando se selecciona
+        )
+
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # Frame para el título DISCO MANAGER
@@ -125,7 +147,7 @@ class DiscotecaApp(ctk.CTk):
             frame,
             fg_color="#1e1e2d",  # Fondo interno del cuadro
             border_color="#7209b7",  # Color del borde
-            border_width=2  # Ancho del borde
+            border_width=1  # Ancho del borde
         )
         entry.pack(
             side="right", 
@@ -166,7 +188,7 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
-            border_width=2
+            border_width=1
         )
         self.evento_nombre.grid(row=1, column=0, columnspan=2, padx=10, sticky="ew")
 
@@ -181,7 +203,7 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
-            border_width=2
+            border_width=1
         )
         self.evento_descripcion.grid(row=3, column=0, columnspan=2, padx=10, sticky="ew")
 
@@ -200,7 +222,7 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
-            border_width=2
+            border_width=1
         )
         self.evento_precio.grid(row=5, column=0, padx=10, sticky="ew")
 
@@ -215,7 +237,7 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
-            border_width=2
+            border_width=1
         )
         self.evento_aforo.grid(row=5, column=1, padx=10, sticky="ew")
 
@@ -372,7 +394,7 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
-            border_width=2
+            border_width=1
         )
         self.cliente_nombre.grid(row=1, column=0, padx=10, sticky="ew")
         
@@ -387,7 +409,7 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
-            border_width=2
+            border_width=1
         )
         self.cliente_rut.grid(row=1, column=1, padx=10, sticky="ew")
         
@@ -402,7 +424,7 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
-            border_width=2
+            border_width=1
         )
         self.cliente_email.grid(row=3, column=0, padx=10, pady=(0,10), sticky="ew")
         
@@ -417,7 +439,7 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
-            border_width=2
+            border_width=1
         )
         self.cliente_telefono.grid(row=3, column=1, padx=10, pady=(0, 10), sticky="ew")
 
@@ -525,7 +547,8 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             border_color="#7209b7", 
             fg_color="#25253a",
-            state="readonly"
+            state="readonly",
+            border_width=1
         )
         self.trago_seleccionado.grid(row=1, column=0, padx=10, pady=(5,10), sticky="ew")
 
@@ -534,7 +557,7 @@ class DiscotecaApp(ctk.CTk):
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
-            border_width=2
+            border_width=1
         )
         self.trago_precio.grid(row=1, column=1, padx=10, pady=(5,10), sticky="ew")
 
@@ -560,7 +583,7 @@ class DiscotecaApp(ctk.CTk):
 
         ctk.CTkButton(
             btn_frame, 
-            text="Actualizar Precio",
+            text="🔄 Actualizar Precio",
             command=self.actualizar_precio_trago,
             fg_color="#7209b7",
             hover_color="#9d4dc7",
@@ -572,7 +595,7 @@ class DiscotecaApp(ctk.CTk):
 
         ctk.CTkButton(
             btn_frame, 
-            text="Cambiar Disponibilidad",
+            text="↔ Cambiar Disponibilidad",
             command=self.cambiar_disponibilidad_trago,
             fg_color="#7209b7",
             hover_color="#9d4dc7",
@@ -591,7 +614,7 @@ class DiscotecaApp(ctk.CTk):
         self.trago_tree = ttk.Treeview(tab, columns=columns, show="headings")
         for col in columns:
             self.trago_tree.heading(col, text=col)
-            self.trago_tree.column(col, width=120)
+            self.trago_tree.column(col, width=60)
 
         self.trago_tree.pack(fill="both", expand=True, padx=20, pady=10)
         self.actualizar_lista_tragos()
@@ -604,7 +627,7 @@ class DiscotecaApp(ctk.CTk):
         ctk.CTkLabel(
             instrucciones_frame, 
             text="① Seleccione cliente → ② Añada tragos → ③ Confirme pedido",
-            font=("Arial", 12, "bold"),
+            font=("Arial", 13, "bold"),
             text_color="#7209b7"
         ).pack()
 
@@ -622,7 +645,7 @@ class DiscotecaApp(ctk.CTk):
             cliente_frame,
             fg_color="#25253a",  # Fondo interno del cuadro
             border_color="#7209b7",  # Color del borde
-            border_width=2,  # Ancho del borde
+            border_width=1  # Ancho del borde
         )
         self.busqueda_cliente.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.busqueda_cliente.bind("<KeyRelease>", self.filtrar_clientes)
@@ -632,7 +655,8 @@ class DiscotecaApp(ctk.CTk):
             cliente_frame, 
             border_color="#7209b7", 
             fg_color="#25253a",
-            state="readonly"
+            state="readonly",
+            border_width=1
         )
         self.lista_clientes.grid(row=0, column=2, columnspan=2, padx=5, pady=5, sticky="ew")
         self.actualizar_lista_clientes_combo()
@@ -648,7 +672,7 @@ class DiscotecaApp(ctk.CTk):
         self.cliente_seleccionado_label.pack(pady=5)
 
         # Frame para agregar tragos
-        tragos_frame = ctk.CTkFrame(tab, fg_color="#25253a", corner_radius=15)
+        tragos_frame = ctk.CTkFrame(tab, fg_color="#1e1e2d", corner_radius=15)
         tragos_frame.pack(fill="x", padx=10, pady=10)
 
         # Búsqueda de tragos
@@ -661,7 +685,7 @@ class DiscotecaApp(ctk.CTk):
             tragos_frame,
             fg_color="#25253a",  # Fondo interno del cuadro
             border_color="#7209b7",  # Color del borde
-            border_width=2  # Ancho del borde
+            border_width=1  # Ancho del borde
         )
         self.busqueda_trago.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.busqueda_trago.bind("<KeyRelease>", self.filtrar_tragos)
@@ -671,7 +695,8 @@ class DiscotecaApp(ctk.CTk):
             tragos_frame, 
             border_color="#7209b7",
             fg_color="#25253a",  # Fondo interno del cuadro
-            state="readonly"
+            state="readonly",
+            border_width=1
         )
         self.lista_tragos.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
         self.actualizar_lista_tragos_combo()
@@ -686,7 +711,7 @@ class DiscotecaApp(ctk.CTk):
             tragos_frame, 
             width=140,
             border_color="#7209b7",  # Color del borde
-            border_width=2,
+            border_width=1,
             fg_color="#25253a"
         )
         self.trago_cantidad.grid(row=1, column=1, padx=5, pady=5)
@@ -714,7 +739,7 @@ class DiscotecaApp(ctk.CTk):
         )
         
         # Configurar columnas
-        col_widths = [150, 60, 120, 100, 40]
+        col_widths = [150, 60, 120, 100, 30]
         for col, width in zip(columns, col_widths):
             self.pedido_tree.heading(col, text=col)
             self.pedido_tree.column(col, width=width, anchor="center")
@@ -723,13 +748,23 @@ class DiscotecaApp(ctk.CTk):
         style = ttk.Style()
         style.theme_use("default")
         style.configure("Treeview", 
-            background="#2a2d2e",
-            foreground="white",
-            fieldbackground="#2a2d2e",
+            background="#25253a",          # Color de fondo para las filas
+            foreground="white",           # Color del texto
+            fieldbackground="#25253a",    # Color de fondo para el área de datos
             bordercolor="#3b3b3b",
             borderwidth=0
         )
-        style.map('Treeview', background=[('selected', '#3a7ebf')])
+        # Color para la cabecera (nombres de columnas)
+        style.configure("Treeview.Heading",
+            background="#1e1e2d",         # Color de fondo de la cabecera
+            foreground="white",           # Color del texto de la cabecera
+            borderwidth=1
+        )
+        # Color cuando se selecciona una fila
+        style.map('Treeview', 
+            background=[('selected', '#7209b7')],     # Color morado cuando se selecciona
+            foreground=[('selected', 'white')]        # Color del texto cuando se selecciona
+        )
         
         self.pedido_tree.pack(fill="both", expand=True, padx=20, pady=(0, 15))
 
