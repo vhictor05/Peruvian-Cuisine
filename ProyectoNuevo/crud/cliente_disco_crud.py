@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import ClienteDiscoteca
+from models_folder.models_disco import ClienteDiscoteca
 from typing import Optional
 
 class ClienteDiscotecaCRUD:

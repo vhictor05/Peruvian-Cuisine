@@ -9,7 +9,7 @@ from crud.cliente_crud import ClienteCRUD
 from crud.menu_crud import MenuCRUD
 from crud.pedido_crud import PedidoCRUD
 from database import get_db, engine, Base
-from models import Pedido,Ingrediente,Cliente,MenuIngrediente,Pedido,Menu
+from models_folder.models_restaurente import Pedido,Ingrediente,Cliente,MenuIngrediente,Pedido,Menu
 from tkinter import ttk
 from fpdf import FPDF
 from tkinter import messagebox as CTkM
@@ -28,33 +28,51 @@ class MainApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Gestión de Restaurante")
-        self.geometry("1300x700")
+        self.geometry("1300x600")
         self.configure(fg_color="#1e1e2d")  # Fondo oscuro
-
-        # Menú lateral
-        self.menu_frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=0)
-        self.menu_frame.grid(row=0, column=0, sticky="ns", padx=0, pady=0)
-
-        # Contenedor principal
-        self.main_frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15, width=800, height=700)
-        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=30, pady=30)
-
-        # Título del menú
-        self.app_title = ctk.CTkLabel(
-            self.menu_frame, 
-            text="Restaurante App", 
-            text_color="#4361ee", 
-            font=("Arial", 23)
+        
+        # Frame del título
+        self.title_frame = ctk.CTkFrame(
+            self, 
+            fg_color="#1e1e2d",
+            corner_radius=0
         )
-        self.app_title.grid(row=0, column=0, pady=50)
+        self.title_frame.grid(row=0, column=0, pady="65", sticky="ew")
+
+        # Título RESTAURANTE
+        self.app_title = ctk.CTkLabel(
+            self.title_frame, 
+            text="RESTAURANTE", 
+            text_color="#4361ee", 
+            font=("Arial", 26, "bold")
+        )
+        self.app_title.pack(pady=0, padx=(20,0), anchor="w")  
+        
+        # Menú lateral (ahora en row=1)
+        self.menu_frame = ctk.CTkFrame(
+            self, 
+            fg_color="#25253e", 
+            corner_radius=15
+        )
+        self.menu_frame.grid(row=1, column=0, sticky="nsw", padx=30, pady=(0, 30))
+
+        # Contenedor principal (ahora en column=1)
+        self.main_frame = ctk.CTkFrame(
+            self, 
+            fg_color="#25253e", 
+            corner_radius=15, 
+            width=800, 
+            height=700
+        )
+        self.main_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(0, 30), pady=30)
 
         # Botones de navegación
-        self.create_menu_button("Clientes", "ClientePanel", 1)
-        self.create_menu_button("Ingredientes", "IngredientePanel", 2)
-        self.create_menu_button("Menu", "MenuPanel", 3)
-        self.create_menu_button("Panel de compra", "PanelCompra", 4)
-        self.create_menu_button("Pedidos", "PanelPedido", 5)
-        self.create_menu_button("Graficos", "GraficosPanel", 6)
+        self.create_menu_button("   Clientes", "ClientePanel", 1)
+        self.create_menu_button("   Ingredientes", "IngredientePanel", 2)
+        self.create_menu_button("   Menu", "MenuPanel", 3)
+        self.create_menu_button("   Panel de compra", "PanelCompra", 4)
+        self.create_menu_button("   Pedidos", "PanelPedido", 5)
+        self.create_menu_button("   Graficos", "GraficosPanel", 6)
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -63,13 +81,15 @@ class MainApp(ctk.CTk):
             self.menu_frame,
             text=text,
             command=lambda: self.load_panel(panel_name),
-            font=("Arial", 16, "bold"),
-            corner_radius=50,
+            font=("Arial", 20),
+            corner_radius=0,
             height=40,
-            fg_color="#4361ee",
+            width=200,
+            fg_color="#25253a",
             hover_color="#5a75f0",
+            anchor="w",
         )
-        button.grid(row=row, column=0, pady=15, padx=10, sticky="ew")
+        button.grid(row=row, column=0, pady=15, sticky="w")
 
     def load_panel(self, panel_name):
         for widget in self.main_frame.winfo_children():
@@ -115,14 +135,76 @@ class ClientePanel(ctk.CTkFrame):
         )
         self.label_title.grid(row=0, column=0, columnspan=2, pady=20)
 
-        # Formulario
-        self.nombre_entry = self.create_form_entry("Nombre del Cliente", 1)
-        self.email_entry = self.create_form_entry("Email del Cliente", 2)
-        self.rut_entry = self.create_form_entry("Rut del Cliente", 3)
+        # Frame para datos del cliente
+        self.cliente_frame = ctk.CTkFrame(
+            self, 
+            fg_color="#1e1e2d",
+            corner_radius=15,
+            width=300,
+            height=200
+        )
+        self.cliente_frame.grid(row=1, column=0, pady=10, padx=30, sticky="nsew")
+        self.cliente_frame.grid_propagate(False)
+
+        # Título del frame
+        self.cliente_title = ctk.CTkLabel(
+            self.cliente_frame,
+            text="Datos del Cliente",
+            text_color="#4361ee",
+            font=("Arial", 18, "bold")
+        )
+        self.cliente_title.pack(pady=(0,5))
+
+        # Contenedor para los campos
+        self.fields_frame = ctk.CTkFrame(
+            self.cliente_frame,
+            fg_color="#1e1e2d",
+            corner_radius=0
+        )
+        self.fields_frame.pack(pady=5, padx=20, fill="x")
+
+        # Campo Nombre
+        self.nombre_label = ctk.CTkLabel(self.fields_frame, text="Nombre:", font=("Arial", 14))
+        self.nombre_label.pack(anchor="w", pady=2)
+        self.nombre_entry = ctk.CTkEntry(
+            self.fields_frame,
+            fg_color="#25253e",
+            border_color="#4361ee",
+            border_width=1,
+            corner_radius=5,
+            height=30
+        )
+        self.nombre_entry.pack(fill="x", pady=(0,5))
+
+        # Campo Email
+        self.email_label = ctk.CTkLabel(self.fields_frame, text="Email:", font=("Arial", 14))
+        self.email_label.pack(anchor="w", pady=2)
+        self.email_entry = ctk.CTkEntry(
+            self.fields_frame,
+            fg_color="#25253e",
+            border_color="#4361ee",
+            border_width=1,
+            corner_radius=5,
+            height=30
+        )
+        self.email_entry.pack(fill="x", pady=(0,5))
+
+        # Campo RUT
+        self.rut_label = ctk.CTkLabel(self.fields_frame, text="RUT:", font=("Arial", 14))
+        self.rut_label.pack(anchor="w", pady=2)
+        self.rut_entry = ctk.CTkEntry(
+            self.fields_frame,
+            fg_color="#25253e",
+            border_color="#4361ee",
+            border_width=1,
+            corner_radius=5,
+            height=30
+        )
+        self.rut_entry.pack(fill="x", pady=(0,5))
 
         # Botones de acción
         btn_frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15)
-        btn_frame.grid(row=4, column=0, pady=10, padx=10, sticky="ew")
+        btn_frame.grid(row=4, column=0, pady=10, padx=30, sticky="ew")
 
         self.add_button = ctk.CTkButton(
             btn_frame,
@@ -130,10 +212,10 @@ class ClientePanel(ctk.CTkFrame):
             command=self.add_cliente,
             fg_color="#4361ee",
             hover_color="#5a75f0",
-            font=("Arial", 16, "bold"),
+            font=("Arial", 16),
             height=50,
             width=150,
-            corner_radius=50
+            corner_radius=15
         )
         self.add_button.grid(row=0, column=0, padx=10, pady=5)
 
@@ -143,12 +225,12 @@ class ClientePanel(ctk.CTkFrame):
             command=self.open_edit_window,
             fg_color="#4361ee",
             hover_color="#5a75f0",
-            font=("Arial", 16, "bold"),
+            font=("Arial", 16),
             height=50,
             width=150,
-            corner_radius=50
+            corner_radius=15
         )
-        self.update_button.grid(row=0, column=1, padx=10, pady=5)
+        self.update_button.grid(row=1, column=0, padx=10, pady=5)
 
         self.delete_button = ctk.CTkButton(
             btn_frame,
@@ -156,12 +238,12 @@ class ClientePanel(ctk.CTkFrame):
             command=self.delete_cliente,
             fg_color="#4361ee",
             hover_color="#5a75f0",
-            font=("Arial", 16, "bold"),
+            font=("Arial", 16),
             height=50,
             width=150,
-            corner_radius=50
+            corner_radius=15
         )
-        self.delete_button.grid(row=1, column=0, columnspan=2, pady=10)
+        self.delete_button.grid(row=2, column=0, columnspan=2, pady=10)
 
         # Lista de clientes (Treeview)
         self.cliente_list = self.create_treeview(Cliente)
@@ -180,7 +262,7 @@ class ClientePanel(ctk.CTkFrame):
         return treeview
 
     def create_form_entry(self, label_text, row):
-        frame = ctk.CTkFrame(self, fg_color="#25253e", corner_radius=15)
+        frame = ctk.CTkFrame(self, fg_color="#25253a", corner_radius=15)
         frame.grid(row=row, column=0, pady=10, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
@@ -188,9 +270,9 @@ class ClientePanel(ctk.CTkFrame):
 
         entry = ctk.CTkEntry(
             frame, 
-            fg_color="#1e1e2d",
+            fg_color="#25253a",
             border_color="#4361ee", 
-            border_width=2, 
+            border_width=1, 
             corner_radius=10
         )
         entry.pack(side="right", fill="x", expand=True, padx=10)
@@ -280,9 +362,9 @@ class ClientePanel(ctk.CTkFrame):
             frame,
             corner_radius=10, 
             width=200,
-            fg_color="#1e1e2d",
+            fg_color="#25253a",
             border_color="#4361ee",
-            border_width=2
+            border_width=1
         )
         entry.insert(0, value)
         entry.pack(side="right", fill="x", expand=True, padx=10)
@@ -391,40 +473,40 @@ class IngredientePanel(ctk.CTkFrame):
             btn_frame, 
             text="Añadir Ingrediente", 
             command=self.add_ingrediente, 
-            corner_radius=50,
+            corner_radius=15,
             fg_color="#4361ee",
             hover_color="#5a75f0",
-            font=("Arial", 18, "bold"),
+            font=("Arial", 18),
             height=50,
-            width=150
+            width=400  # Ancho fijo para todos los botones
         )
-        self.add_button.grid(row=0, column=0, padx=10, pady=5)
+        self.add_button.pack(pady=5, padx=10, fill="x")  # Cambiado a pack con fill="x"
 
         self.update_button = ctk.CTkButton(
             btn_frame, 
             text="Actualizar Ingrediente", 
             command=self.open_edit_window, 
-            corner_radius=50,
+            corner_radius=15,
             fg_color="#4361ee",
             hover_color="#5a75f0",
-            font=("Arial", 18, "bold"),
+            font=("Arial", 18),
             height=50,
-            width=150
+            width=400  # Mismo ancho que el botón anterior
         )
-        self.update_button.grid(row=1, column=0, padx=10, pady=5)
+        self.update_button.pack(pady=5, padx=10, fill="x")  # Cambiado a pack con fill="x"
 
         self.delete_button = ctk.CTkButton(
             btn_frame, 
             text="Eliminar Ingrediente", 
             command=self.delete_ingrediente, 
-            corner_radius=50,
+            corner_radius=15,
             fg_color="#4361ee",
             hover_color="#5a75f0",
-            font=("Arial", 18, "bold"),
+            font=("Arial", 18),
             height=50,
-            width=150
+            width=400  # Mismo ancho que los otros botones
         )
-        self.delete_button.grid(row=2, column=0, columnspan=2, pady=10)
+        self.delete_button.pack(pady=5, padx=10, fill="x")  # Cambiado a pack con fill="x"
 
         # Lista de ingredientes (Treeview)
         self.ingrediente_list = self.create_treeview(Ingrediente)
@@ -451,9 +533,9 @@ class IngredientePanel(ctk.CTkFrame):
 
         entry = ctk.CTkEntry(
             frame, 
-            fg_color="#1e1e2d",
+            fg_color="#25253a",
             border_color="#4361ee", 
-            border_width=2, 
+            border_width=1, 
             corner_radius=10
         )
         entry.pack(side="right", fill="x", expand=True, padx=10)
@@ -527,9 +609,9 @@ class IngredientePanel(ctk.CTkFrame):
             frame,
             corner_radius=10, 
             width=200,
-            fg_color="#1e1e2d",
+            fg_color="#25253a",
             border_color="#4361ee",
-            border_width=2
+            border_width=1
         )
         entry.insert(0, value)
         entry.pack(side="right", fill="x", expand=True, padx=10)
@@ -636,9 +718,9 @@ class MenuPanel(ctk.CTkFrame):
             self.ingredientes_frame, 
             corner_radius=10, 
             width=100,
-            fg_color="#1e1e2d",
+            fg_color="#25253a",
             border_color="#4361ee",
-            border_width=2
+            border_width=1
         )
         self.cantidad_entry.grid(row=1, column=1, padx=10, pady=5)
 
@@ -749,7 +831,7 @@ class MenuPanel(ctk.CTkFrame):
                 messagebox.showerror("Error", "La cantidad debe ser mayor que cero.")
                 return
         except ValueError:
-            messagebox.showerror("Error", "La cantidad debe ser un número.")
+            messagebox.showerror("Error", "Cantidad debe ser un número.")
             return
 
         # Check if the ingredient already exists in the list
@@ -863,16 +945,33 @@ class MenuPanel(ctk.CTkFrame):
             self.edit_descripcion_entry = self.create_form_entry_in_window("Descripción del Menú", 2, menu.descripcion)
             self.edit_precio_entry = self.create_form_entry_in_window("Precio del Menú", 3, menu.precio)
 
-            self.edit_ingredientes_frame = ctk.CTkFrame(self.edit_window, fg_color="#2c2c2c", corner_radius=10)
+            self.edit_ingredientes_frame = ctk.CTkFrame(
+                self.edit_window, 
+                fg_color="#2c2c2c", 
+                corner_radius=10
+            )
             self.edit_ingredientes_frame.grid(row=4, column=0, pady=10, padx=10, sticky="ew")
 
-            self.edit_ingredientes_label = ctk.CTkLabel(self.edit_ingredientes_frame, text="Ingredientes", font=("Arial", 14))
+            self.edit_ingredientes_label = ctk.CTkLabel(
+                self.edit_ingredientes_frame, 
+                text="Ingredientes", 
+                font=("Arial", 14)
+            )
             self.edit_ingredientes_label.grid(row=0, column=0, padx=10, pady=5)
 
-            self.edit_ingredientes_combobox = ctk.CTkComboBox(self.edit_ingredientes_frame, values=[], width=200, corner_radius=10)
+            self.edit_ingredientes_combobox = ctk.CTkComboBox(
+                self.edit_ingredientes_frame, 
+                values=[], 
+                width=200, 
+                corner_radius=10
+            )
             self.edit_ingredientes_combobox.grid(row=1, column=0, padx=10, pady=5)
 
-            self.edit_cantidad_entry = ctk.CTkEntry(self.edit_ingredientes_frame, corner_radius=10, width=100)
+            self.edit_cantidad_entry = ctk.CTkEntry(
+                self.edit_ingredientes_frame, 
+                corner_radius=10, 
+                width=100
+            )
             self.edit_cantidad_entry.grid(row=1, column=1, padx=10, pady=5)
 
             self.edit_add_ingrediente_button = ctk.CTkButton(
@@ -934,9 +1033,9 @@ class MenuPanel(ctk.CTkFrame):
             frame,
             corner_radius=10, 
             width=200,
-            fg_color="#1e1e2d",
+            fg_color="#25253a",
             border_color="#4361ee",
-            border_width=2
+            border_width=1
         )
         entry.insert(0, value)
         entry.pack(side="right", fill="x", expand=True, padx=10)
@@ -1093,9 +1192,9 @@ class MenuPanel(ctk.CTkFrame):
 
         entry = ctk.CTkEntry(
             frame, 
-            fg_color="#1e1e2d",
+            fg_color="#25253a",
             border_color="#4361ee", 
-            border_width=2, 
+            border_width=1, 
             corner_radius=10
         )
         entry.pack(side="right", fill="x", expand=True, padx=10)
@@ -1147,7 +1246,7 @@ class PanelCompra(ctk.CTkFrame):
             command=self.add_to_cart, 
             corner_radius=50,
             fg_color="#4361ee",
-            hover_color="#5a75f0"
+            hover_color="#5a75f0",
         )
         self.add_button.grid(row=0, column=2, padx=10)  # Adjust column index
 
@@ -1200,9 +1299,9 @@ class PanelCompra(ctk.CTkFrame):
         entry = ctk.CTkEntry(
             frame, 
             corner_radius=10,
-            fg_color="#1e1e2d",
+            fg_color="#25253a",
             border_color="#4361ee",
-            border_width=2
+            border_width=1
         )
         entry.grid(row=0, column=1, padx=10)
 
@@ -1429,7 +1528,7 @@ class PanelPedido(ctk.CTkFrame):
         return treeview
 
     def create_filter_entry(self, label_text, column):
-        frame = ctk.CTkFrame(self.filter_frame, fg_color="#25253e", corner_radius=15)
+        frame = ctk.CTkFrame(self.filter_frame, fg_color="#25253a", corner_radius=15)
         frame.grid(row=0, column=column, pady=5, padx=10, sticky="ew")
 
         label = ctk.CTkLabel(frame, text=label_text, font=("Arial", 14))
@@ -1439,9 +1538,9 @@ class PanelPedido(ctk.CTkFrame):
             frame, 
             corner_radius=10, 
             width=200,
-            fg_color="#1e1e2d",
+            fg_color="#25253a",
             border_color="#4361ee",
-            border_width=2
+            border_width=1
         )
         entry.pack(side="right", fill="x", expand=True, padx=10)
 
@@ -1522,8 +1621,6 @@ class PanelPedido(ctk.CTkFrame):
             menus = ", ".join([f"{menu['cantidad']}x {MenuCRUD.get_menu_by_id(self.db, menu['id']).nombre}" for menu in pedido.menus])
             self.pedido_list.insert("", "end", values=(pedido.id, pedido.descripcion, pedido.total, pedido.fecha, pedido.cliente_rut,menus))
 
-
-
     def edit_pedido(self):
         selected_item = self.pedido_list.selection()
         if not selected_item:
@@ -1565,21 +1662,22 @@ class PanelPedido(ctk.CTkFrame):
 
     def delete_pedido(self):
         selected_item = self.pedido_list.selection()
-        if selected_item:
-            pedido_id = self.pedido_list.item(selected_item)['values'][0]
-            confirm = CTkM.askyesno(
-                "Confirmar Eliminación",
-                f"¿Estás seguro de que deseas eliminar el pedido con ID {pedido_id}?"
-            )
-            if confirm:
-                try:
-                    PedidoCRUD.borrar_pedido(self.db, pedido_id)
-                    self.refresh_list()
-                    self.show_message("Pedido eliminado exitosamente.")
-                except Exception as e:
-                    CTkM.showerror("Error", f"Error al eliminar pedido: {e}")
-        else:
-            CTkM.showwarning("Advertencia", "Selecciona un pedido para eliminar.")
+        if not selected_item:
+            messagebox.showerror("Error", "Selecciona un pedido de la lista.")
+            return
+
+        pedido_id = self.pedido_list.item(selected_item)['values'][0]
+        confirm = CTkM.askyesno(
+            "Confirmar Eliminación",
+            f"¿Estás seguro de que deseas eliminar el pedido con ID {pedido_id}?"
+        )
+        if confirm:
+            try:
+                PedidoCRUD.borrar_pedido(self.db, pedido_id)
+                self.refresh_list()
+                self.show_message("Pedido eliminado exitosamente.")
+            except Exception as e:
+                CTkM.showerror("Error", f"Error al eliminar pedido: {e}")
 
     def on_item_double_click(self, event):
         self.edit_pedido()
@@ -1695,7 +1793,7 @@ class Generarboleta:
         pdf.cell(0, 10, "Razón Social del Negocio mas bakano:", ln=True)
         pdf.cell(0, 10, "RUT: 66.999.666-9", ln=True)
         pdf.cell(0, 10, "Dirección: Calle Falsa 123", ln=True)
-        pdf.cell(0, 10, "Teléfono: +56 9 1234 5678", ln=True)
+        pdf.cell(0, 10, "Teléfono:+56 9 1234 5678", ln=True)
         pdf.ln(10)
 
         # Detalles del pedido
@@ -1730,7 +1828,7 @@ class Generarboleta:
         total_con_iva = total + iva
         
         # Mostrar subtotales y totales
-        pdf.set_font("Arial", "B", 12)
+        pdf.set_font("Arial", "B",12)
         pdf.cell(0, 10, f"Subtotal: ${total:.2f}", 0, 1, "R")
         pdf.cell(0, 10, f"IVA (19%): ${iva:.2f}", 0, 1, "R")
         pdf.cell(0, 10, f"Total: ${total_con_iva:.2f}", 0, 1, "R")
