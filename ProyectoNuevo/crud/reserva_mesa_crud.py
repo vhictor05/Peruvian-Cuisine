@@ -1,6 +1,6 @@
 
 from sqlalchemy.orm import Session
-from models import Evento, ClienteDiscoteca, Mesa, ReservaMesa
+from models_folder.models_disco import Evento, ClienteDiscoteca, Mesa, ReservaMesa
 
 class ReservaMesaCRUD:
     @staticmethod

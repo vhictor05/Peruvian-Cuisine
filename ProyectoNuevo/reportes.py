@@ -3,8 +3,10 @@ from tkinter import messagebox
 from datetime import datetime
 import sqlite3
 from sqlalchemy.orm import Session
-from database import get_db
-from models import Base
+from database import get_db,Base,engine
+from models_folder.models_reporte import Base, ReporteError
+
+Base.metadata.create_all(bind=engine)
 
 # Configuración de la interfaz
 ctk.set_appearance_mode("dark")

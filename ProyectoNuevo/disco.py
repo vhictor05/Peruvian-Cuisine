@@ -3,7 +3,7 @@ from tkinter import messagebox, ttk
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from disco_database import get_db, engine, Base
-from models import Evento, ClienteDiscoteca, Entrada, Mesa, ReservaMesa, Trago, PedidoTrago
+from models_folder.models_disco import Trago, PedidoTrago, Evento, ClienteDiscoteca, Entrada, Mesa, ReservaMesa
 from crud.evento_crud import EventoCRUD
 from crud.cliente_disco_crud import ClienteDiscotecaCRUD
 from tkcalendar import Calendar, DateEntry
@@ -459,7 +459,6 @@ class DiscotecaApp(ctk.CTk):
             height=40,
             width=150
         ).pack(pady=10)
-
         # Tabla de clientes
         self.cliente_tree = self.create_treeview(["ID", "Nombre", "RUT", "Email", "Teléfono"])
         self.actualizar_lista_clientes()

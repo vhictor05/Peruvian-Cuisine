@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import Trago
+from models_folder.models_disco import Trago
 from typing import List, Optional
 
 # Lista de tragos predefinidos

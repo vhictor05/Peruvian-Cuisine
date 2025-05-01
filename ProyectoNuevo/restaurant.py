@@ -9,7 +9,7 @@ from crud.cliente_crud import ClienteCRUD
 from crud.menu_crud import MenuCRUD
 from crud.pedido_crud import PedidoCRUD
 from database import get_db, engine, Base
-from models import Pedido,Ingrediente,Cliente,MenuIngrediente,Pedido,Menu
+from models_folder.models_restaurente import Pedido,Ingrediente,Cliente,MenuIngrediente,Pedido,Menu
 from tkinter import ttk
 from fpdf import FPDF
 from tkinter import messagebox as CTkM
