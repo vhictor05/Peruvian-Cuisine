@@ -447,9 +447,16 @@ class DiscotecaApp(ctk.CTk):
         form_frame.columnconfigure(0, weight=1)
         form_frame.columnconfigure(1, weight=1)
 
+        # Frame para botones
+        button_frame = ctk.CTkFrame(
+            self.main_frame,
+            fg_color="transparent"
+        )
+        button_frame.pack(pady=10)
+
         # Botón para registrar cliente
         ctk.CTkButton(
-            self.main_frame,
+            button_frame,
             text="📄 Registrar Cliente",
             fg_color="#7209b7",
             hover_color="#9d4dc7",
@@ -458,7 +465,21 @@ class DiscotecaApp(ctk.CTk):
             font=("Arial", 14),
             height=40,
             width=150
-        ).pack(pady=10)
+        ).pack(side="left", padx=5)
+
+        # Botón para eliminar cliente (nuevo)
+        ctk.CTkButton(
+            button_frame,
+            text="🗑 Eliminar Cliente",
+            fg_color="#7209b7",
+            hover_color="#9d4dc7",
+            command=self.eliminar_cliente,
+            corner_radius=15,
+            font=("Arial", 14),
+            height=40,
+            width=150
+        ).pack(side="left", padx=5)
+
         # Tabla de clientes
         self.cliente_tree = self.create_treeview(["ID", "Nombre", "RUT", "Email", "Teléfono"])
         self.actualizar_lista_clientes()
@@ -477,6 +498,33 @@ class DiscotecaApp(ctk.CTk):
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
+    def eliminar_cliente(self):
+        # Obtener el cliente seleccionado en el Treeview
+        selected_item = self.cliente_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione un cliente para eliminar")
+            return
+        
+        # Obtener el ID del cliente
+        cliente_id = self.cliente_tree.item(selected_item[0], "values")[0]
+        
+        # Confirmar eliminación
+        confirmacion = messagebox.askyesno(
+            "Confirmar eliminación",
+            "¿Está seguro que desea eliminar este cliente? Esta acción no se puede deshacer."
+        )
+        
+        if confirmacion:
+            try:
+                # Eliminar el cliente usando el CRUD
+                if ClienteDiscotecaCRUD.eliminar(self.db, cliente_id):
+                    messagebox.showinfo("Éxito", "Cliente eliminado correctamente")
+                    self.actualizar_lista_clientes()
+                else:
+                    messagebox.showerror("Error", "No se pudo eliminar el cliente")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo eliminar el cliente: {str(e)}")
+
     def actualizar_lista_clientes(self):
         self.cliente_tree.delete(*self.cliente_tree.get_children())
         for c in ClienteDiscotecaCRUD.obtener_todos(self.db):
@@ -490,8 +538,6 @@ class DiscotecaApp(ctk.CTk):
         tree.pack(fill="both", expand=True, padx=20, pady=10)
         return tree
     
-
-
     def show_tragos(self):
             self.clear_main_frame()
             
