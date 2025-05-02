@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import Evento
+from models_folder.models_disco import Evento
 from typing import Optional
 
 class EventoCRUD:

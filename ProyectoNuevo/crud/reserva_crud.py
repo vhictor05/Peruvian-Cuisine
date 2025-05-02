@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
-from models import Reserva, Habitacion
+from models_folder.models_hotel import Reserva, Habitacion
 from sqlalchemy import and_
 
 class ReservaCRUD:

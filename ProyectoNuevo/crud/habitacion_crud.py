@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import Habitacion
+from models_folder.models_hotel import Habitacion
 
 class HabitacionCRUD:
     @staticmethod

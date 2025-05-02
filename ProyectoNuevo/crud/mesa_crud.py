@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import Mesa
+from models_folder.models_restaurente import Mesa
 from typing import Optional
 
 class MesaCRUD:
