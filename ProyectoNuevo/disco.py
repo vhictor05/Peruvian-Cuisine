@@ -302,7 +302,7 @@ class DiscotecaApp(ctk.CTk):
         ctk.CTkButton(
             button_frame,
             text="🖊 Editar Evento",
-            # Poner aqui su command
+            command=self.editar_evento,
             fg_color="#7209b7",
             hover_color="#9d4dc7",
             font=("Arial", 14),
@@ -315,7 +315,7 @@ class DiscotecaApp(ctk.CTk):
         ctk.CTkButton(
             button_frame,
             text="🗑 Eliminar Evento",
-            # Poner aqui su command
+            command=self.eliminar_evento,
             fg_color="#7209b7",
             hover_color="#9d4dc7",
             font=("Arial", 14),
@@ -326,7 +326,10 @@ class DiscotecaApp(ctk.CTk):
 
         # Tabla de eventos
         self.evento_tree = self.create_treeview(["ID", "Nombre", "Fecha", "Precio", "Aforo"])
+        self.evento_tree.bind("<<TreeviewSelect>>", self.cargar_evento_seleccionado)
         self.actualizar_lista_eventos()
+
+    
 
     def registrar_evento(self):
         try:
@@ -357,6 +360,101 @@ class DiscotecaApp(ctk.CTk):
             
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
+    def cargar_evento_seleccionado(self, event):
+        selected_item = self.evento_tree.selection()
+        if not selected_item:
+            return
+        
+        evento_id = self.evento_tree.item(selected_item[0], "values")[0]
+        evento = EventoCRUD.obtener_por_id(self.db, evento_id)
+        
+        if evento:
+            self.evento_nombre.delete(0, "end")
+            self.evento_descripcion.delete(0, "end")
+            self.evento_precio.delete(0, "end")
+            self.evento_aforo.delete(0, "end")
+            
+            self.evento_nombre.insert(0, evento.nombre)
+            self.evento_descripcion.insert(0, evento.descripcion or "")
+            self.evento_precio.insert(0, str(evento.precio_entrada))
+            self.evento_aforo.insert(0, str(evento.aforo_maximo))
+            
+            fecha_hora = evento.fecha
+            self.cal.set_date(fecha_hora.date())
+            self.hora_spinbox.set(f"{fecha_hora.hour:02d}")
+            self.minuto_spinbox.set(f"{fecha_hora.minute:02d}")
+
+    def editar_evento(self):
+        selected_item = self.evento_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione un evento para editar")
+            return
+        
+        try:
+            evento_id = self.evento_tree.item(selected_item[0], "values")[0]
+            
+            fecha = self.cal.get_date()
+            hora = int(self.hora_spinbox.get())
+            minuto = int(self.minuto_spinbox.get())
+            
+            fecha_hora = datetime(
+                year=fecha.year,
+                month=fecha.month,
+                day=fecha.day,
+                hour=hora,
+                minute=minuto
+            )
+            
+            nuevos_datos = {
+                "nombre": self.evento_nombre.get(),
+                "descripcion": self.evento_descripcion.get(),
+                "fecha": fecha_hora,
+                "precio_entrada": float(self.evento_precio.get()),
+                "aforo_maximo": int(self.evento_aforo.get())
+            }
+            
+            if EventoCRUD.actualizar(self.db, evento_id, nuevos_datos):
+                messagebox.showinfo("Éxito", "Evento actualizado correctamente")
+                self.actualizar_lista_eventos()
+                # Limpiar campos después de editar
+                self.evento_nombre.delete(0, "end")
+                self.evento_descripcion.delete(0, "end")
+                self.evento_precio.delete(0, "end")
+                self.evento_aforo.delete(0, "end")
+            else:
+                messagebox.showerror("Error", "No se pudo actualizar el evento")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al editar evento: {str(e)}")
+
+    def eliminar_evento(self):
+        selected_item = self.evento_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione un evento para eliminar")
+            return
+        
+        evento_id = self.evento_tree.item(selected_item[0], "values")[0]
+        
+        confirmacion = messagebox.askyesno(
+            "Confirmar eliminación",
+            "¿Está seguro que desea eliminar este evento? Esta acción no se puede deshacer."
+        )
+        
+        if confirmacion:
+            try:
+                if EventoCRUD.eliminar(self.db, evento_id):
+                    messagebox.showinfo("Éxito", "Evento eliminado correctamente")
+                    self.actualizar_lista_eventos()
+                    # Limpiar campos después de eliminar
+                    self.evento_nombre.delete(0, "end")
+                    self.evento_descripcion.delete(0, "end")
+                    self.evento_precio.delete(0, "end")
+                    self.evento_aforo.delete(0, "end")
+                else:
+                    messagebox.showerror("Error", "No se pudo eliminar el evento")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo eliminar el evento: {str(e)}")
 
     def actualizar_lista_eventos(self):
         self.evento_tree.delete(*self.evento_tree.get_children())
@@ -650,19 +748,90 @@ class DiscotecaApp(ctk.CTk):
             width=150
         ).pack(side="left", padx=10)
 
+        ctk.CTkButton(
+        btn_frame, 
+        text="📦 Actualizar Stock",
+        command=self.actualizar_stock_trago,
+        fg_color="#7209b7",
+        hover_color="#9d4dc7",
+        corner_radius=15,
+        font=("Arial", 14),
+        height=40,
+        width=150
+        ).pack(side="left", padx=5)
+
         # Actualizar lista de tragos
         self.actualizar_lista_tragos_combobox()
         self.trago_seleccionado.bind("<<ComboboxSelected>>", self.on_trago_selected)
 
         # Lista de tragos
-        columns = ["ID", "Nombre", "Precio", "Categoría", "Disponible"]
+        columns = ["ID", "Nombre", "Precio", "Categoría", "Disponible", "Stock"]
         self.trago_tree = ttk.Treeview(tab, columns=columns, show="headings")
-        for col in columns:
-            self.trago_tree.heading(col, text=col)
-            self.trago_tree.column(col, width=60)
-
-        self.trago_tree.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Configurar encabezados
+        self.trago_tree.heading("ID", text="ID")
+        self.trago_tree.heading("Nombre", text="Nombre")
+        self.trago_tree.heading("Precio", text="Precio")
+        self.trago_tree.heading("Categoría", text="Categoría")
+        self.trago_tree.heading("Disponible", text="Disponible")
+        self.trago_tree.heading("Stock", text="Stock")
+        
+        # Configurar anchos de columna
+        self.trago_tree.column("ID", width=50, anchor="center")
+        self.trago_tree.column("Nombre", width=150, anchor="w")
+        self.trago_tree.column("Precio", width=100, anchor="e")
+        self.trago_tree.column("Categoría", width=100, anchor="w")
+        self.trago_tree.column("Disponible", width=80, anchor="center")
+        self.trago_tree.column("Stock", width=60, anchor="center")
+        
         self.actualizar_lista_tragos()
+        self.trago_tree.pack(fill="both", expand=True, padx=20, pady=10)
+
+        ctk.CTkLabel(
+        form_frame, 
+        text="Stock:",
+        font=("Arial", 14)
+    ).grid(row=5, column=0, padx=10, pady=(5,0), sticky="w")
+    
+        self.trago_stock = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#7209b7", 
+            border_width=1
+        )
+        self.trago_stock.grid(row=5, column=1, padx=10, pady=(5,10), sticky="ew")
+
+    def on_trago_selected(self, event):
+        trago_str = self.trago_seleccionado.get()
+        if trago_str:
+            trago_nombre = trago_str.split(" ($")[0]
+            trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+            if trago:
+                self.trago_precio.delete(0, "end")
+                self.trago_precio.insert(0, str(trago.precio))
+                self.trago_stock.delete(0, "end")
+                self.trago_stock.insert(0, str(trago.stock))
+                self.trago_disponible.select() if trago.disponible else self.trago_disponible.deselect()
+
+    def actualizar_stock_trago(self):
+        try:
+            trago_str = self.trago_seleccionado.get()
+            nuevo_stock = int(self.trago_stock.get())
+            
+            if not trago_str:
+                messagebox.showwarning("Advertencia", "Seleccione un trago primero")
+                return
+                
+            trago_nombre = trago_str.split(" ($")[0]
+            trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+            
+            if trago:
+                trago.stock = nuevo_stock
+                self.db.commit()
+                messagebox.showinfo("Éxito", "Stock actualizado correctamente")
+                self.actualizar_lista_tragos()
+        except ValueError:
+            messagebox.showerror("Error", "Ingrese un valor numérico válido para el stock")
 
     def setup_tragos_pedidos_tab(self, tab):
         # Frame de instrucciones
@@ -850,17 +1019,20 @@ class DiscotecaApp(ctk.CTk):
             messagebox.showerror("Error", str(e))
 
     def actualizar_lista_tragos(self):
+        # Limpiar la tabla primero
         for item in self.trago_tree.get_children():
             self.trago_tree.delete(item)
-            
+        
+        # Obtener todos los tragos y mostrarlos correctamente
         tragos = TragoCRUD.obtener_todos(self.db)
         for trago in tragos:
+            disponible = "Sí" if trago.disponible else "No"
             self.trago_tree.insert("", "end", values=(
                 trago.id,
                 trago.nombre,
-                trago.descripcion or "",
                 f"${trago.precio:.2f}",
-                trago.categoria or ""
+                trago.categoria or "",
+                disponible
             ))
 
     def obtener_tragos_combobox(self):

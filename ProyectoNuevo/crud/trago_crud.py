@@ -4,16 +4,16 @@ from typing import List, Optional
 
 # Lista de tragos predefinidos
 TRAGOS_PREDEFINIDOS = [
-    {"nombre": "Piscola", "precio": 5000, "categoria": "Pisco"},
-    {"nombre": "Pisco Sour", "precio": 6000, "categoria": "Pisco"},
-    {"nombre": "Pisco con Redbull", "precio": 7000, "categoria": "Pisco"},
-    {"nombre": "Cerveza Lata", "precio": 3000, "categoria": "Cerveza"},
-    {"nombre": "Cerveza Botella", "precio": 3500, "categoria": "Cerveza"},
-    {"nombre": "Roncola", "precio": 5500, "categoria": "Ron"},
-    {"nombre": "Cubalibre", "precio": 6000, "categoria": "Ron"},
-    {"nombre": "Jugo Natural", "precio": 2500, "categoria": "Bebida"},
-    {"nombre": "Agua Mineral", "precio": 2000, "categoria": "Bebida"},
-    {"nombre": "Bebida", "precio": 2500, "categoria": "Bebida"}
+    {"nombre": "Piscola", "precio": 5000, "categoria": "Pisco", "stock": 100},
+    {"nombre": "Pisco Sour", "precio": 6000, "categoria": "Pisco", "stock": 50},
+    {"nombre": "Pisco con Redbull", "precio": 7000, "categoria": "Pisco", "stock": 30},
+    {"nombre": "Cerveza Lata", "precio": 3000, "categoria": "Cerveza", "stock": 80},
+    {"nombre": "Cerveza Botella", "precio": 3500, "categoria": "Cerveza", "stock": 80},
+    {"nombre": "Roncola", "precio": 5500, "categoria": "Ron", "stock": 80},
+    {"nombre": "Cubalibre", "precio": 6000, "categoria": "Ron", "stock": 80},
+    {"nombre": "Jugo Natural", "precio": 2500, "categoria": "Bebida", "stock": 80},
+    {"nombre": "Agua Mineral", "precio": 2000, "categoria": "Bebida", "stock": 80},
+    {"nombre": "Bebida", "precio": 2500, "categoria": "Bebida", "stock": 80}
 ]
 
 class TragoCRUD:
