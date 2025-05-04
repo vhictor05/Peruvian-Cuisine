@@ -1,28 +1,22 @@
 @startuml
+actor Cliente
+participant "GUI Disco" as GUI
+participant "ControladorBar" as Controlador
+participant "Trago" as Trago
+participant "PedidoBar" as Pedido
+participant "BoletaService" as Boleta
 
-actor Usuario
-participant SistemaPrincipal
-participant IServicio
-participant IReservar
-participant IComprar
+Cliente -> GUI : seleccionarTrago()
+GUI -> Trago : obtenerDatosTrago()
+Trago --> GUI : infoTrago
+GUI -> Cliente : mostrarInfo()
 
-
-
-== Selección del servicio ==
-Usuario -> SistemaPrincipal : elegir_servicio("hotel" | "restaurante" | "casino")
-SistemaPrincipal -> IServicio : mostrar_menu()
-IServicio --> SistemaPrincipal : menu_mostrado
-
-== Flujo de compra ==
-Usuario -> SistemaPrincipal : compra()
-SistemaPrincipal -> IServicio : OPT()
-IServicio -> IComprar : Efectua compra()
-IComprar--> SistemaPrincipal : regreso a interfaz principal
-
-== Flujo de reserva ==
-Usuario -> SistemaPrincipal  : reserva()
-SistemaPrincipal -> IServicio : OPT()
-IServicio -> IReservar : confirmacion_reserva()
-IReservar--> SistemaPrincipal : regreso a interfaz principal
-
+Cliente -> GUI : confirmarCompra()
+GUI -> Controlador : procesarCompra(trago)
+Controlador -> Pedido : registrarPedido(cliente, trago)
+Pedido --> Controlador : pedidoCreado
+Controlador -> Boleta : generarBoleta(pedido)
+Boleta --> Controlador : boleta
+Controlador -> GUI : mostrarBoleta()
+GUI -> Cliente : mostrarConfirmación()
 @enduml

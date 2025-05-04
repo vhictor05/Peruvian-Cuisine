@@ -1,17 +1,31 @@
 @startuml
 
+' ==== INTERFACES COMPORTAMENTALES ====
+interface IServicio {
+  +mostrar_menu(): void
+}
+
+interface IReservable {
+  +reservar(): void
+}
+
+interface IComprable {
+  +comprar(): void
+}
+
 ' ==== SISTEMA PRINCIPAL ====
 class SistemaPrincipal {
-  +casino: Casino
-  +hotel: Hotel
-  +restaurante: Restaurante
-  +elegir_servicio(tipo: str)
+  +servicios: List<IServicio>
+  +elegir_servicio(tipo: str): IServicio
+  +mostrar_opciones(): void
 }
-SistemaPrincipal o-- "1" Casino
-SistemaPrincipal o-- "1" Hotel
-SistemaPrincipal o-- "1" Restaurante
+SistemaPrincipal --> IServicio : usa()
 
-' ==== CASINO ====
+
+
+
+
+' ==== Disco  ====
 class Evento {
   +id: int
   +nombre: str
@@ -21,7 +35,7 @@ class Evento {
   +aforo_maximo: int
 }
 
-class ClienteDiscoteca {
+class ClienteDisco {
   +id: int
   +nombre: str
   +rut: str
@@ -34,14 +48,18 @@ class Entrada {
   +cliente_id: int
   +evento_id: int
   +fecha_compra: datetime
+  +reservar(): void
 }
+Entrada ..|> IReservable 
 
 class Trago {
   +id: int
   +nombre: str
   +descripcion: str
   +precio: float
+  +comprar(): void
 }
+Trago ..|> IComprable
 
 class PedidoBar {
   +id: int
@@ -50,36 +68,39 @@ class PedidoBar {
   +total: float
 }
 
-class Casino {
+class Disco {
   +eventos: List<Evento>
-  +clientes: List<ClienteDiscoteca>
+  +clientes: List<ClienteDisco >
   +entradas: List<Entrada>
   +tragos: List<Trago>
   +pedidos_bar: List<PedidoBar>
-  +reserva_entrada(): void
-  +comprar_trago(): void
+  +mostrar_menu(): void
+  +reservar(): void
+  +comprar(): void
 }
 
-Casino o-- "0..1" Evento
-Casino *-- "0..*" ClienteDiscoteca
-Casino *-- "0..*" Entrada
-Casino *-- "0..*" Trago
-Casino *-- "0..*" PedidoBar
+Disco  ..|> IServicio
+
+Disco *-- "0..1" Evento
+Disco  *-- "0..*" ClienteDisco 
+Disco  *-- "0..*" Entrada
+Disco *-- "0..*" Trago
+Disco *-- "0..*" PedidoBar
 
 Entrada "*" --* "1" Evento
-Entrada "*" --* "1" ClienteDiscoteca
-
-PedidoBar "0..*" --* "1" ClienteDiscoteca
+Entrada "*" --* "1" ClienteDisco
+PedidoBar "0..*" --* "1" ClienteDisco
 PedidoBar "1" --o "1..*" Trago
 
-' ==== HOTEL ====
+
+
+' ==== HOTEL (CENTRAL) ====
 class Huesped {
   +id: int
   +nombre: str
   +rut: str
   +email: str
   +telefono: str
-
 }
 
 class Reserva {
@@ -97,6 +118,7 @@ class Habitacion {
   +precio: float
   +disponible: bool
 }
+Habitacion ..|> IReservable
 
 class DetalleReservaHabitacion {
   +reserva_id: int
@@ -108,17 +130,19 @@ class Hotel {
   +huespedes: List<Huesped>
   +habitaciones: List<Habitacion>
   +reservas: List<Reserva>
-  +realizar_reserva(): void
-  +comprar_articulo(): void
+  +mostrar_menu(): void
+  +reservar(): void
+  +comprar(): void
 }
+Hotel ..|> IServicio
 
 Hotel *-- "0..*" Huesped
 Hotel *-- "1..*" Habitacion
 Hotel *-- "0..*" Reserva
 Reserva "*" --> "1" Huesped
-
 Reserva "*" --* "*" DetalleReservaHabitacion
 Habitacion "*" --* "*" DetalleReservaHabitacion
+
 
 
 ' ==== RESTAURANTE ====
@@ -133,7 +157,9 @@ class Menu {
   +nombre: str
   +descripcion: str
   +precio: float
+  +comprar(): void
 }
+Menu ..|> IComprable
 
 class Pedido {
   +id: int
@@ -148,45 +174,28 @@ class Mesa {
   +numero: int
   +capacidad: int
   +disponible: bool
+  +reservar(): void
 }
-
-class ReservaRestaurante {
-  +id: int
-  +cliente_id: int
-  +fecha: datetime
-  +cantidad_personas: int
-}
-
-class DetalleReservaMesa {
-  +reserva_id: int
-  +mesa_id: int
-  +comentario: str
-}
+Mesa ..|> IReservable
 
 class Restaurante {
   +clientes: List<Cliente>
   +Menu: List<Menu>
   +pedidos: List<Pedido>
-  +reservas: List<ReservaRestaurante>
   +mesas: List<Mesa>
-  +hacer_pedido(): void
-  +reservar_mesa(): void
+  +mostrar_menu(): void
+  +reservar(): void
+  +comprar(): void
 }
+Restaurante ..|> IServicio
+
 Restaurante *-- "0..*" Cliente
 Restaurante *-- "0..*" Pedido
 Restaurante *-- "1..*" Menu
-Restaurante *-- "0..*" ReservaRestaurante
 Restaurante *-- "1..*" Mesa
 
 Pedido "1" --* "1" Cliente
 Pedido "1" --* "1..*" Menu
-
-ReservaRestaurante "*" --* "1" Cliente
-ReservaRestaurante "*" --* "*" DetalleReservaMesa
-Mesa "*" --* "*" DetalleReservaMesa
-
+Mesa "*" --* "1 " Cliente
 
 @enduml
-
-
-#entrar a https://www.plantuml.com/plantuml/uml/  ejecutar codigo en caso de querer modificar diagrama.

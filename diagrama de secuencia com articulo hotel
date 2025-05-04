@@ -1,0 +1,21 @@
+@startuml
+actor Cliente
+participant "GUI Hotel" as GUI
+participant "ControladorCompraHotel" as Controlador
+participant "Articulo" as Articulo
+participant "BoletaService" as Boleta
+
+Cliente -> GUI : seleccionarArticulo()
+GUI -> Articulo : obtenerInfo()
+Articulo --> GUI : infoArticulo
+GUI -> Cliente : mostrarArticulo()
+
+Cliente -> GUI : comprarArticulo()
+GUI -> Controlador : procesarCompra(articulo)
+Controlador -> Articulo : registrarCompra()
+Articulo --> Controlador : compraOK
+Controlador -> Boleta : generarBoleta()
+Boleta --> Controlador : boleta
+Controlador -> GUI : mostrarBoleta()
+GUI -> Cliente : mostrarOK()
+@enduml

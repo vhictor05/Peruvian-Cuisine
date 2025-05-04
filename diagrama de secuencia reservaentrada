@@ -1,0 +1,25 @@
+@startuml
+actor Cliente
+participant "GUI Disco" as GUI
+participant "ControladorEvento" as Controlador
+participant "Evento" as Evento
+participant "Entrada" as Entrada
+participant "BoletaService" as Boleta
+
+Cliente -> GUI : seleccionarEvento()
+GUI -> Evento : obtenerInfoEvento()
+Evento --> GUI : detallesEvento
+GUI -> Cliente : mostrarEvento()
+
+Cliente -> GUI : ingresarFechaReserva()
+GUI -> Cliente : confirmarFecha(fecha)
+
+Cliente -> GUI : reservarEntrada(fecha)
+GUI -> Controlador : procesarReserva(evento, fecha)
+Controlador -> Entrada : crearEntrada(cliente, evento, fecha)
+Entrada --> Controlador : entradaCreada
+Controlador -> Boleta : generarBoleta(entrada)
+Boleta --> Controlador : boleta
+Controlador -> GUI : mostrarBoleta()
+GUI -> Cliente : mostrarConfirmación()
+@enduml

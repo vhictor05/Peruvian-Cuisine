@@ -25,7 +25,7 @@ SistemaPrincipal --> IServicio : usa()
 
 
 
-' ==== CASINO ====
+' ==== Disco  ====
 class Evento {
   +id: int
   +nombre: str
@@ -35,7 +35,7 @@ class Evento {
   +aforo_maximo: int
 }
 
-class ClienteDiscoteca {
+class ClienteDisco {
   +id: int
   +nombre: str
   +rut: str
@@ -68,9 +68,9 @@ class PedidoBar {
   +total: float
 }
 
-class Casino {
+class Disco {
   +eventos: List<Evento>
-  +clientes: List<ClienteDiscoteca>
+  +clientes: List<ClienteDisco >
   +entradas: List<Entrada>
   +tragos: List<Trago>
   +pedidos_bar: List<PedidoBar>
@@ -78,17 +78,18 @@ class Casino {
   +reservar(): void
   +comprar(): void
 }
-Casino ..|> IServicio
 
-Casino *-- "0..1" Evento
-Casino *-- "0..*" ClienteDiscoteca
-Casino *-- "0..*" Entrada
-Casino *-- "0..*" Trago
-Casino *-- "0..*" PedidoBar
+Disco  ..|> IServicio
+
+Disco *-- "0..1" Evento
+Disco  *-- "0..*" ClienteDisco 
+Disco  *-- "0..*" Entrada
+Disco *-- "0..*" Trago
+Disco *-- "0..*" PedidoBar
 
 Entrada "*" --* "1" Evento
-Entrada "*" --* "1" ClienteDiscoteca
-PedidoBar "0..*" --* "1" ClienteDiscoteca
+Entrada "*" --* "1" ClienteDisco
+PedidoBar "0..*" --* "1" ClienteDisco
 PedidoBar "1" --o "1..*" Trago
 
 

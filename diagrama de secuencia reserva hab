@@ -1,0 +1,22 @@
+@startuml
+actor Cliente
+participant "GUI Hotel" as GUI
+participant "ControladorHotel" as Controlador
+participant "Habitacion" as Habitacion
+participant "Reserva" as Reserva
+participant "DetalleReservaHabitacion" as Detalle
+
+Cliente -> GUI : seleccionarHabitacion()
+GUI -> Habitacion : obtenerInfo()
+Habitacion --> GUI : infoHabitacion
+GUI -> Cliente : mostrarHabitacion()
+
+Cliente -> GUI : confirmarReserva(fecha_entrada, fecha_salida)
+GUI -> Controlador : procesarReserva()
+Controlador -> Habitacion : verificarDisponibilidad()
+Habitacion --> Controlador : disponible
+Controlador -> Reserva : crearReserva()
+Controlador -> Detalle : vincularHabitacion()
+Controlador -> GUI : mostrarConfirmacion()
+GUI -> Cliente : mostrarOK()
+@enduml

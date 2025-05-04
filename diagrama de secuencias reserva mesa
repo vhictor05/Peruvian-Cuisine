@@ -1,0 +1,18 @@
+@startuml
+actor Cliente
+participant "GUI Restaurante" as GUI
+participant "ControladorMesa" as Controlador
+participant "Mesa" as Mesa
+
+Cliente -> GUI : seleccionarMesa()
+GUI -> Mesa : obtenerInfo()
+Mesa --> GUI : infoMesa
+GUI -> Cliente : mostrarMesa()
+
+Cliente -> GUI : reservarMesa()
+GUI -> Controlador : procesarReserva(mesa)
+Controlador -> Mesa : reservar()
+Mesa --> Controlador : reservaOK
+Controlador -> GUI : mostrarConfirmacion()
+GUI -> Cliente : mostrarOK()
+@enduml

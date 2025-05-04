@@ -1,0 +1,21 @@
+@startuml
+actor Cliente
+participant "GUI Restaurante" as GUI
+participant "ControladorMenu" as Controlador
+participant "Menu" as Menu
+participant "BoletaService" as Boleta
+
+Cliente -> GUI : seleccionarMenu()
+GUI -> Menu : obtenerInfo()
+Menu --> GUI : infoMenu
+GUI -> Cliente : mostrarMenu()
+
+Cliente -> GUI : confirmarCompra()
+GUI -> Controlador : procesarCompra(menu)
+Controlador -> Menu : registrarCompra()
+Menu --> Controlador : compraOK
+Controlador -> Boleta : generarBoleta()
+Boleta --> Controlador : boleta
+Controlador -> GUI : mostrarBoleta()
+GUI -> Cliente : mostrarOK()
+@enduml
