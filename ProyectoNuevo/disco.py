@@ -706,10 +706,10 @@ class DiscotecaApp(ctk.CTk):
 
         # Checkbox para disponibilidad
         self.trago_disponible = ctk.CTkCheckBox(
-            form_frame, 
-            text="Disponible", 
-            fg_color="#7209b7", 
-            hover_color="#9d4dc7"
+        form_frame, 
+        text="Disponible", 
+        fg_color="#7209b7", 
+        hover_color="#9d4dc7"
         )
         self.trago_disponible.grid(
             row=4, 
@@ -826,10 +826,16 @@ class DiscotecaApp(ctk.CTk):
             trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
             
             if trago:
-                trago.stock = nuevo_stock
-                self.db.commit()
-                messagebox.showinfo("Éxito", "Stock actualizado correctamente")
-                self.actualizar_lista_tragos()
+                if TragoCRUD.actualizar_stock(self.db, trago.id, nuevo_stock):
+                    if nuevo_stock <= 0:
+                        messagebox.showinfo("Éxito", "Stock actualizado y trago marcado como no disponible")
+                    else:
+                        messagebox.showinfo("Éxito", "Stock actualizado correctamente")
+                    self.actualizar_lista_tragos()
+                    # Actualizar el checkbox de disponibilidad
+                    self.trago_disponible.select() if trago.disponible else self.trago_disponible.deselect()
+                else:
+                    messagebox.showerror("Error", "No se pudo actualizar el stock")
         except ValueError:
             messagebox.showerror("Error", "Ingrese un valor numérico válido para el stock")
 
@@ -1019,7 +1025,6 @@ class DiscotecaApp(ctk.CTk):
             messagebox.showerror("Error", str(e))
 
     def actualizar_lista_tragos(self):
-        # Limpiar la tabla primero
         for item in self.trago_tree.get_children():
             self.trago_tree.delete(item)
         
@@ -1032,7 +1037,8 @@ class DiscotecaApp(ctk.CTk):
                 trago.nombre,
                 f"${trago.precio:.2f}",
                 trago.categoria or "",
-                disponible
+                disponible,
+                trago.stock  # Mostrar el stock
             ))
 
     def obtener_tragos_combobox(self):
@@ -1163,6 +1169,8 @@ class DiscotecaApp(ctk.CTk):
             if trago:
                 self.trago_precio.delete(0, "end")
                 self.trago_precio.insert(0, str(trago.precio))
+                self.trago_stock.delete(0, "end")
+                self.trago_stock.insert(0, str(trago.stock))
                 self.trago_disponible.select() if trago.disponible else self.trago_disponible.deselect()
 
     def actualizar_precio_trago(self):

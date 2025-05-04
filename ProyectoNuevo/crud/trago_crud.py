@@ -28,7 +28,7 @@ class TragoCRUD:
 
     @staticmethod
     def obtener_todos(db: Session) -> List[Trago]:
-        return db.query(Trago).filter(Trago.disponible == True).order_by(Trago.categoria, Trago.nombre).all()
+        return db.query(Trago).order_by(Trago.categoria, Trago.nombre).all()
 
     @staticmethod
     def obtener_por_id(db: Session, trago_id: int) -> Optional[Trago]:
@@ -47,7 +47,22 @@ class TragoCRUD:
     def cambiar_disponibilidad(db: Session, trago_id: int, disponible: bool) -> bool:
         trago = db.query(Trago).filter(Trago.id == trago_id).first()
         if trago:
+            # No permitir marcar como disponible si el stock es 0
+            if disponible and trago.stock <= 0:
+                return False
             trago.disponible = disponible
+            db.commit()
+            return True
+        return False
+
+    @staticmethod
+    def actualizar_stock(db: Session, trago_id: int, nuevo_stock: int) -> bool:
+        trago = db.query(Trago).filter(Trago.id == trago_id).first()
+        if trago:
+            trago.stock = nuevo_stock
+            # Si el stock llega a 0, marcar como no disponible
+            if nuevo_stock <= 0:
+                trago.disponible = False
             db.commit()
             return True
         return False
