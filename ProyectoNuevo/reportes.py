@@ -1,12 +1,11 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from datetime import datetime
-import sqlite3
 from sqlalchemy.orm import Session
-from database import get_db,Base,engine
-from models_folder.models_reporte import Base, ReporteError
-
-Base.metadata.create_all(bind=engine)
+from database import get_db, engine
+from models_folder.models_reporte import ReporteError
+from report_database import get_report_db, init_report_db
+from models_folder.models_reporte import ReporteError
 
 # Configuración de la interfaz
 ctk.set_appearance_mode("dark")
@@ -15,13 +14,13 @@ ctk.set_default_color_theme("blue")
 class ReportesApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("PRIVITAIN CUISINE - Reportes de Errores")
+        self.title("Dormilon Admin APP - Reportes de Errores")
         self.geometry("1000x700")
         self.configure(fg_color="#1e1e2d")
         
-        # Conexión a la base de datos
-        self.db: Session = next(get_db())
-        
+        init_report_db()
+        # Conexión a la base de datos de reportes
+        self.db = next(get_report_db())
         # Crear estructura de la interfaz
         self.create_widgets()
         
@@ -140,18 +139,57 @@ class ReportesApp(ctk.CTk):
             width=100
         ).pack(side="left", padx=10)
         
-        # Tabla de reportes
-        self.reportes_tree = ctk.CTkFrame(tab)
-        self.reportes_tree.pack(fill="both", expand=True, padx=20, pady=20)
+        # Contenedor para la tabla
+        self.tabla_container = ctk.CTkScrollableFrame(tab)
+        self.tabla_container.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Aquí iría la implementación de la tabla real usando CTkTable o similar
-        # Por ahora es un placeholder
-        ctk.CTkLabel(
-            self.reportes_tree, 
-            text="Tabla de reportes aparecerá aquí\n(En desarrollo)",
-            font=("Arial", 16),
-            text_color="#a5a8b3"
-        ).pack(expand=True)
+        # Encabezados de la tabla
+        self.crear_encabezados_tabla()
+        
+        # Frame para los datos
+        self.tabla_datos_frame = ctk.CTkFrame(self.tabla_container, fg_color="transparent")
+        self.tabla_datos_frame.pack(fill="both", expand=True)
+        
+        # Cargar datos iniciales
+        self.cargar_reportes()
+    
+    def crear_encabezados_tabla(self):
+        # Frame para los encabezados
+        encabezados_frame = ctk.CTkFrame(self.tabla_container, fg_color="#4cc9f0", height=40)
+        encabezados_frame.pack(fill="x", pady=(0, 5))
+        
+        # Columnas
+        columnas = ["ID", "Título", "Módulo", "Urgencia", "Estado", "Fecha", "Reportado por"]
+        anchos = [50, 200, 100, 80, 100, 120, 150]
+        
+        for i, (columna, ancho) in enumerate(zip(columnas, anchos)):
+            ctk.CTkLabel(
+                encabezados_frame,
+                text=columna,
+                text_color="white",
+                font=("Arial", 12, "bold"),
+                width=ancho
+            ).grid(row=0, column=i, padx=2, sticky="w")
+    
+    def mostrar_datos_tabla(self, datos):
+        # Limpiar datos anteriores
+        for widget in self.tabla_datos_frame.winfo_children():
+            widget.destroy()
+        
+        # Mostrar nuevos datos
+        for i, fila in enumerate(datos):
+            frame_fila = ctk.CTkFrame(self.tabla_datos_frame, fg_color="#2a2a3a" if i % 2 == 0 else "#1e1e2d")
+            frame_fila.pack(fill="x", pady=1)
+            
+            for j, valor in enumerate(fila):
+                ctk.CTkLabel(
+                    frame_fila,
+                    text=valor,
+                    text_color="white",
+                    font=("Arial", 12),
+                    anchor="w",
+                    width=50 if j == 0 else 200 if j == 1 else 100 if j == 2 else 80 if j == 3 else 100 if j == 4 else 120 if j == 5 else 150
+                ).grid(row=0, column=j, padx=2, sticky="w")
     
     def enviar_reporte(self):
         titulo = self.reporte_titulo.get()
@@ -164,26 +202,29 @@ class ReportesApp(ctk.CTk):
             return
         
         try:
-            # Aquí iría la lógica para guardar en la base de datos
-            # Por ahora es solo un mock
-            reporte_data = {
-                "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "titulo": titulo,
-                "modulo": modulo,
-                "urgencia": urgencia,
-                "descripcion": descripcion,
-                "estado": "Abierto",
-                "reportado_por": "Usuario Actual"  # Debería obtenerse del sistema de autenticación
-            }
+            # Crear nuevo reporte
+            nuevo_reporte = ReporteError(
+                titulo=titulo,
+                modulo=modulo,
+                urgencia=urgencia,
+                descripcion=descripcion,
+                estado="Abierto",
+                reportado_por="Usuario Actual"  # En un sistema real, obtendrías esto del auth
+            )
             
-            # Guardar en base de datos (implementación pendiente)
-            # self.guardar_reporte_en_db(reporte_data)
+            # Guardar en base de datos
+            self.db.add(nuevo_reporte)
+            self.db.commit()
             
             messagebox.showinfo("Éxito", "Reporte enviado correctamente")
             self.limpiar_formulario()
+            self.cargar_reportes()  # Actualizar la tabla
             
         except Exception as e:
+            self.db.rollback()
             messagebox.showerror("Error", f"No se pudo enviar el reporte: {str(e)}")
+        finally:
+            self.db.close()
     
     def limpiar_formulario(self):
         self.reporte_titulo.delete(0, "end")
@@ -192,8 +233,53 @@ class ReportesApp(ctk.CTk):
         self.reporte_descripcion.delete("1.0", "end")
     
     def cargar_reportes(self):
-        # Implementación pendiente para cargar reportes filtrados
-        pass
+        try:
+            # Obtener nueva conexión a la base de datos
+            db = next(get_report_db())
+            
+            # Obtener filtros
+            modulo = self.filtro_modulo.get()
+            urgencia = self.filtro_urgencia.get()
+            estado = self.filtro_estado.get()
+            
+            # Construir query
+            query = db.query(ReporteError)
+            
+            if modulo != "Todos":
+                query = query.filter(ReporteError.modulo == modulo)
+            
+            if urgencia != "Todos":
+                query = query.filter(ReporteError.urgencia == urgencia)
+            
+            if estado != "Todos":
+                query = query.filter(ReporteError.estado == estado)
+            
+            # Ordenar por fecha descendente
+            reportes = query.order_by(ReporteError.fecha_reporte.desc()).all()
+            
+            # Preparar datos para la tabla
+            datos_tabla = []
+            for reporte in reportes:
+                datos_tabla.append([
+                    str(reporte.id),
+                    reporte.titulo[:30] + "..." if len(reporte.titulo) > 30 else reporte.titulo,
+                    reporte.modulo,
+                    reporte.urgencia,
+                    reporte.estado,
+                    reporte.fecha_reporte.strftime("%Y-%m-%d %H:%M"),
+                    reporte.reportado_por
+                ])
+            
+            # Mostrar datos en la tabla
+            if datos_tabla:
+                self.mostrar_datos_tabla(datos_tabla)
+            else:
+                self.mostrar_datos_tabla([["No hay datos coincidentes"] * 7])
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudieron cargar los reportes: {str(e)}")
+        finally:
+            db.close()
 
 if __name__ == "__main__":
     app = ReportesApp()
