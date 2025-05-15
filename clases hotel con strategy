@@ -1,0 +1,64 @@
+@startuml
+' Estilo opcional
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #fdfdfd
+
+' ==== INTERFAZ DE ESTRATEGIA ====
+interface EstrategiaPrecio {
+    +calcular_precio(base: float): float
+}
+
+' ==== CLASES CONCRETAS ====
+class PrecioNormal {
+    +calcular_precio(base: float): float
+}
+
+class PrecioConDescuento {
+    +calcular_precio(base: float): float
+}
+
+class PrecioConIVA {
+    +calcular_precio(base: float): float
+}
+
+EstrategiaPrecio <|.. PrecioNormal
+EstrategiaPrecio <|.. PrecioConDescuento
+EstrategiaPrecio <|.. PrecioConIVA
+
+' ==== CLASE RESERVA ====
+class Reserva {
+    +id: int
+    +huesped_id: int
+    +habitacion_id: int
+    +fecha_entrada: date
+    +fecha_salida: date
+    +estado: str
+    +estrategia: EstrategiaPrecio
+    +calcular_precio(): float
+}
+
+Reserva --> EstrategiaPrecio : usa
+
+' ==== CLASE HABITACION (referencial) ====
+class Habitacion {
+    +id: int
+    +numero: str
+    +tipo: str
+    +precio: float
+    +disponible: bool
+}
+
+' ==== CLASE HUESPED (referencial) ====
+class Huesped {
+    +id: int
+    +nombre: str
+    +rut: str
+    +email: str
+    +telefono: str
+}
+
+' Relaciones existentes
+Reserva --> Habitacion
+Reserva --> Huesped
+
+@enduml

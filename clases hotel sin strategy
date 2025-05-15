@@ -1,0 +1,69 @@
+@startuml
+
+' ==== INTERFACES COMPORTAMENTALES ====
+interface IServicio {
+  +mostrar_menu(): void
+}
+
+interface IReservable {
+  +reservar(): void
+}
+
+
+
+
+' ==== HOTEL (CENTRAL) ====
+class Huesped {
+  +id: int
+  +nombre: str
+  +rut: str
+  +email: str
+  +telefono: str
+}
+
+class Reserva {
+  +id: int
+  +huesped_id: int
+  +fecha_entrada: date
+  +fecha_salida: date
+  +estado: str
+}
+
+class Habitacion {
+  +id: int
+  +numero: str
+  +tipo: str
+  +precio: float
+  +disponible: bool
+}
+
+
+class DetalleReservaHabitacion {
+  +reserva_id: int
+  +habitacion_id: int
+  +notas: str
+}
+
+class Hotel {
+  +huespedes: List<Huesped>
+  +habitaciones: List<Habitacion>
+  +reservas: List<Reserva>
+  +mostrar_menu(): void
+  +reservar(): void
+  +comprar(): void
+}
+Hotel ..|> IServicio
+Habitacion ..|> IReservable
+
+
+Hotel *-- "0..*" Huesped
+Hotel *-- "1..*" Habitacion
+Hotel *-- "0..*" Reserva
+Reserva "*" --> "1" Huesped
+Reserva "*" --* "*" DetalleReservaHabitacion
+Habitacion "*" --* "*" DetalleReservaHabitacion
+
+
+
+
+@enduml
