@@ -746,8 +746,19 @@ class HotelApp(ctk.CTk):
             if not habitaciones_disponibles:
              raise ValueError("No hay habitaciones disponibles en este momento")
 
-            # === Aplicar estrategia de precio ===
-            estrategia = PrecioConIVA()  # Puedes cambiarlo por PrecioNormal() o PrecioConDescuento()
+
+            # === Aplicar estrategia de precio dinámica según selección ===
+            tipo = self.tipo_precio.get()
+
+            if tipo == "Normal":
+                estrategia = PrecioNormal()
+            elif tipo == "Con Descuento":
+                estrategia = PrecioConDescuento()
+            elif tipo == "Con IVA":
+                estrategia = PrecioConIVA()
+            else:
+                raise ValueError("Tipo de precio no válido")
+
             precio_final = estrategia.calcular_precio(habitaciones_disponibles.precio)
             messagebox.showinfo("Precio final", f"Precio final de la habitación: ${precio_final:.2f}")
 
