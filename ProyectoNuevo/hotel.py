@@ -681,10 +681,13 @@ class HotelApp(ctk.CTk):
         return [f"{h.numero} - {h.tipo}" for h in habitaciones]
 
     def actualizar_lista_reservas(self):
-        # Verificar si el TreeView está disponible
-        if not hasattr(self, 'reserva_tree') or not self.reserva_tree.winfo_exists():
-            print("El TreeView no está disponible o ha sido destruido.")
-            return  # Evita errores si el TreeView no existe
+        try:
+            if not hasattr(self, 'reserva_tree') or not self.reserva_tree.winfo_exists():
+                print("El TreeView no está disponible o ha sido destruido.")
+                return
+        except Exception as e:
+            print(f"Error al acceder al TreeView: {e}")
+            return
         
         # Limpiar los elementos del TreeView
         for item in self.reserva_tree.get_children():
@@ -776,8 +779,9 @@ class HotelApp(ctk.CTk):
             self.db.commit()
             
             messagebox.showinfo("Éxito", "Reserva creada correctamente")
-            self.actualizar_lista_reservas()
-            self.actualizar_lista_habitaciones()
+            
+            if hasattr(self, 'reserva_tree') and self.reserva_tree.winfo_exists():
+                self.actualizar_lista_reservas()
             
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo crear la reserva: {str(e)}")
@@ -800,7 +804,8 @@ class HotelApp(ctk.CTk):
         try:
             ReservaCRUD.eliminar_reserva(self.db, reserva_id=int(reserva_id))
             messagebox.showinfo("Éxito", "Reserva eliminada correctamente")
-            self.actualizar_lista_reservas()
+            if hasattr(self, 'reserva_tree') and self.reserva_tree.winfo_exists():
+                self.actualizar_lista_reservas()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo eliminar la reserva: {str(e)}")
 
