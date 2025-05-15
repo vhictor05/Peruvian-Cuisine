@@ -10,6 +10,26 @@ from crud.reserva_crud import ReservaCRUD
 from datetime import datetime, timedelta
 from tkcalendar import DateEntry
 
+# ===== ESTRATEGIA DE PRECIO =====
+from abc import ABC, abstractmethod
+
+class EstrategiaPrecio(ABC):
+    @abstractmethod
+    def calcular_precio(self, base: float) -> float:
+        pass
+
+class PrecioNormal(EstrategiaPrecio):
+    def calcular_precio(self, base: float) -> float:
+        return base
+
+class PrecioConDescuento(EstrategiaPrecio):
+    def calcular_precio(self, base: float) -> float:
+        return base * 0.8  # 20% de descuento
+
+class PrecioConIVA(EstrategiaPrecio):
+    def calcular_precio(self, base: float) -> float:
+        return base * 1.19  # 19% de IVA
+
 recreate_db()  # Recreate the database with the new schema
 Base.metadata.create_all(bind=engine)
 
@@ -576,43 +596,60 @@ class HotelApp(ctk.CTk):
         ).grid(row=2, column=1, padx=10, pady=(10,0), sticky="w")
         
         self.reserva_fecha_salida = ctk.CTkEntry(
-            form_frame, 
-            fg_color="#25253a", 
-            border_color="#f72585", 
-            border_width=1
+        form_frame, 
+        fg_color="#25253a", 
+        border_color="#f72585", 
+        border_width=1
         )
         self.reserva_fecha_salida.grid(row=3, column=1, padx=10, pady=(5,10), sticky="ew")
 
-        # Configurar las columnas del formulario para que las entradas se expandan
+        # Selector de estrategia de precio (Strategy)
+        ctk.CTkLabel(
+        form_frame, 
+        text="Tipo de Precio:", 
+        font=("Arial", 14)
+        ).grid(row=4, column=0, padx=10, pady=(10,0), sticky="w")
+
+        self.tipo_precio = ctk.CTkComboBox(
+        form_frame,
+        values=["Normal", "Con Descuento", "Con IVA"],
+        fg_color="#25253a",
+        border_color="#f72585",
+        border_width=1
+        )
+        self.tipo_precio.set("Normal")
+        self.tipo_precio.grid(row=5, column=0, padx=10, pady=(5,10), sticky="ew")
+
+        # Configurar columnas del formulario
         form_frame.columnconfigure(0, weight=1)
         form_frame.columnconfigure(1, weight=1)
 
-        # Frame para botones
+        # Botones
         btn_frame = ctk.CTkFrame(self.main_frame, fg_color="#25253a", corner_radius=15)
         btn_frame.pack(pady=10)
 
         ctk.CTkButton(
-            btn_frame,
-            text="📄 Crear Reserva",
-            command=self.crear_reserva,
-            fg_color="#f72585",
-            hover_color="#fa5c9c",
-            font=("Arial", 16),
-            height=50,
-            width=140,
-            corner_radius=15
+        btn_frame,
+        text="📄 Crear Reserva",
+        command=self.crear_reserva,
+        fg_color="#f72585",
+        hover_color="#fa5c9c",
+        font=("Arial", 16),
+        height=50,
+        width=140,
+        corner_radius=15
         ).pack(side="left", padx=10)
 
         ctk.CTkButton(
-            btn_frame,
-            text="🗑 Eliminar Reserva",
-            command=self.eliminar_reserva,
-            fg_color="#f72585",
-            hover_color="#fa5c9c",
-            font=("Arial", 16),
-            height=50,
-            width=140,
-            corner_radius=15
+        btn_frame,
+        text="🗑 Eliminar Reserva",
+        command=self.eliminar_reserva,
+        fg_color="#f72585",
+        hover_color="#fa5c9c",
+        font=("Arial", 16),
+        height=50,
+        width=140,
+        corner_radius=15
         ).pack(side="left", padx=10)
 
         # Tabla de reservas
@@ -684,6 +721,8 @@ class HotelApp(ctk.CTk):
             if not huesped:
                 raise ValueError(f"El huésped con rut {huesped_rut} no existe")
             
+            
+            
             # Obtener las fechas
             fecha_entrada = datetime.strptime(self.reserva_fecha_entrada.get(), "%Y-%m-%d")
             fecha_salida = datetime.strptime(self.reserva_fecha_salida.get(), "%Y-%m-%d")
@@ -700,20 +739,25 @@ class HotelApp(ctk.CTk):
             # Si no se encuentra una habitación disponible de ese tipo, buscar una habitación de cualquier tipo
             if not habitaciones_disponibles:
                 habitaciones_disponibles = self.db.query(Habitacion).filter(
-                    Habitacion.disponible == True
-                ).first()  # Buscar cualquier habitación disponible
+                Habitacion.disponible == True
+                ).first()
 
             # Si no hay habitaciones disponibles en general, lanzar error
             if not habitaciones_disponibles:
-                raise ValueError("No hay habitaciones disponibles en este momento")
+             raise ValueError("No hay habitaciones disponibles en este momento")
+
+            # === Aplicar estrategia de precio ===
+            estrategia = PrecioConIVA()  # Puedes cambiarlo por PrecioNormal() o PrecioConDescuento()
+            precio_final = estrategia.calcular_precio(habitaciones_disponibles.precio)
+            messagebox.showinfo("Precio final", f"Precio final de la habitación: ${precio_final:.2f}")
 
             # Crear la reserva
             ReservaCRUD.crear_reserva(
-                self.db,
-                huesped_id=huesped.id,  # Aquí usamos el ID del huésped correctamente
-                habitacion_id=habitaciones_disponibles.id,
-                fecha_entrada=fecha_entrada,
-                fecha_salida=fecha_salida
+            self.db,
+            huesped_id=huesped.id,
+            habitacion_id=habitaciones_disponibles.id,
+            fecha_entrada=fecha_entrada,
+            fecha_salida=fecha_salida
             )
             
             # Actualizar disponibilidad de la habitación
