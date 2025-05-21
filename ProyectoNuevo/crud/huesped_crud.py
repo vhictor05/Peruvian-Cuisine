@@ -1,9 +1,23 @@
 from sqlalchemy.orm import Session
 from models_folder.models_hotel import Huesped
+import re
 
 class HuespedCRUD:
     @staticmethod
     def crear_huesped(db: Session, nombre: str, rut: str, email: str = None, telefono: str = None):
+        # Validaciones en el CRUD (ejemplo)
+        if not re.match(r'^[A-Za-z\s]+$', nombre):
+            raise ValueError("El nombre solo debe contener letras y espacios")
+
+        if not re.match(r'^\d{2}\.\d{3}\.\d{3}-[\dkK]$', rut):
+            raise ValueError("El RUT debe tener formato xx.xxx.xxx-x")
+
+        if email and not re.match(r'^[\w\.-]+@gmail\.com$', email):
+            raise ValueError("El email debe tener formato válido y terminar en @gmail.com")
+
+        if telefono and (not telefono.isdigit() or len(telefono) != 9):
+            raise ValueError("El teléfono debe contener exactamente 9 dígitos numéricos")
+
         huesped = Huesped(nombre=nombre, rut=rut, email=email, telefono=telefono)
         db.add(huesped)
         db.commit()

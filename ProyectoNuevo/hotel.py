@@ -1,4 +1,6 @@
 import customtkinter as ctk
+import tkinter as tk
+import re
 from tkinter import messagebox, ttk
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -8,7 +10,7 @@ from crud.huesped_crud import HuespedCRUD
 from crud.habitacion_crud import HabitacionCRUD
 from crud.reserva_crud import ReservaCRUD
 from datetime import datetime, timedelta
-from tkcalendar import DateEntry
+from tkcalendar import DateEntry, Calendar
 
 # ===== ESTRATEGIA DE PRECIO =====
 from abc import ABC, abstractmethod
@@ -30,7 +32,7 @@ class PrecioConIVA(EstrategiaPrecio):
     def calcular_precio(self, base: float) -> float:
         return base * 1.19  # 19% de IVA
 
-recreate_db()  # Recreate the database with the new schema
+# recreate_db()  Recreate the database with the new schema
 Base.metadata.create_all(bind=engine)
 
 ctk.set_appearance_mode("dark")
@@ -271,59 +273,45 @@ class HotelApp(ctk.CTk):
 
     # ===== MÉTODOS AUXILIARES =====
     def registrar_huesped(self):
-        nombre = self.huesped_nombre.get()
-        rut = self.huesped_rut.get()
-        
-        if not nombre or not rut:
-            messagebox.showerror("Error", "Nombre y RUT son obligatorios")
+        nombre = self.huesped_nombre.get().strip()
+        rut = self.huesped_rut.get().strip()
+        email = self.huesped_email.get().strip()
+        telefono = self.huesped_telefono.get().strip()
+
+        # Validar nombre solo letras y espacios
+        if not re.match(r'^[A-Za-z\s]+$', nombre):
+            messagebox.showerror("Error", "El nombre solo debe contener letras y espacios")
             return
-            
+
+        # Validar RUT formato xx.xxx.xxx-(digito verificador)
+        if not re.match(r'^\d{2}\.\d{3}\.\d{3}-[\dkK]$', rut):
+            messagebox.showerror("Error", "El RUT debe tener formato xx.xxx.xxx-x (dígito verificador 0-9 o k)")
+            return
+
+        # Validar email que termine en @gmail.com
+        if not re.match(r'^[\w\.-]+@gmail\.com$', email):
+            messagebox.showerror("Error", "El email debe tener formato válido y terminar en @gmail.com")
+            return
+
+        # Validar teléfono exactamente 9 dígitos numéricos
+        if not (telefono.isdigit() and len(telefono) == 9):
+            messagebox.showerror("Error", "El teléfono debe contener exactamente 9 dígitos numéricos")
+            return
+
+        # Si todo ok, crear huésped
         try:
             HuespedCRUD.crear_huesped(
                 self.db,
                 nombre=nombre,
                 rut=rut,
-                email=self.huesped_email.get() or None,
-                telefono=self.huesped_telefono.get() or None
+                email=email,
+                telefono=telefono
             )
             messagebox.showinfo("Éxito", "Huésped registrado correctamente")
             self.actualizar_lista_huespedes()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo registrar: {str(e)}")
 
-    def actualizar_lista_huespedes(self):
-        for item in self.huesped_tree.get_children():
-            self.huesped_tree.delete(item)
-            
-        huespedes = self.db.query(Huesped).all()
-        for huesped in huespedes:
-            self.huesped_tree.insert("", "end", values=(
-                huesped.id,
-                huesped.nombre,
-                huesped.rut,
-                huesped.email or "",
-                huesped.telefono or ""
-            ))
-
-    def buscar_huesped(self):
-        rut = self.huesped_rut.get()
-        if not rut:
-            messagebox.showwarning("Advertencia", "Ingrese un RUT para buscar")
-            return
-            
-        huesped = HuespedCRUD.obtener_huesped_por_rut(self.db, rut)
-        if huesped:
-            self.huesped_nombre.delete(0, "end")
-            self.huesped_nombre.insert(0, huesped.nombre)
-            self.huesped_email.delete(0, "end")
-            if huesped.email:
-                self.huesped_email.insert(0, huesped.email)
-            self.huesped_telefono.delete(0, "end")
-            if huesped.telefono:
-                self.huesped_telefono.insert(0, huesped.telefono)
-        else:
-            messagebox.showinfo("Información", "No se encontró el huésped")
-    
     # ===== PANEL HABITACIONES =====
     def show_habitaciones(self):
         self.clear_main_frame()
@@ -542,14 +530,13 @@ class HotelApp(ctk.CTk):
         form_frame = ctk.CTkFrame(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
         form_frame.pack(fill="x", padx=30, pady=10)
 
-        # Campos del formulario organizados con grid()
         # Huésped y Tipo de Habitación (en columnas separadas)
         ctk.CTkLabel(
             form_frame, 
             text="Huésped:", 
             font=("Arial", 14)
         ).grid(row=0, column=0, padx=10, pady=(10,0), sticky="w")
-        
+
         self.reserva_huesped = ctk.CTkComboBox(
             form_frame,
             values=self.obtener_huespedes_combobox(),
@@ -564,7 +551,7 @@ class HotelApp(ctk.CTk):
             text="Tipo de Habitación:", 
             font=("Arial", 14)
         ).grid(row=0, column=1, padx=10, pady=(10,0), sticky="w")
-        
+
         self.habitacion_tipo = ctk.CTkComboBox(
             form_frame,
             values=["VIP", "Penthouse", "Grande", "Mediana", "Pequeña"],
@@ -574,51 +561,72 @@ class HotelApp(ctk.CTk):
         )
         self.habitacion_tipo.grid(row=1, column=1, padx=10, pady=(5,10), sticky="ew")
 
-        # Fecha Entrada y Fecha Salida
+        # Fecha Entrada y Fecha Salida (campos solo para mostrar la fecha seleccionada)
         ctk.CTkLabel(
             form_frame, 
             text="Fecha Entrada:", 
             font=("Arial", 14)
         ).grid(row=2, column=0, padx=10, pady=(10,0), sticky="w")
-        
-        self.reserva_fecha_entrada = ctk.CTkEntry(
-            form_frame, 
-            fg_color="#25253a", 
-            border_color="#f72585", 
+
+        self.fecha_entrada_entry = ctk.CTkEntry(
+            form_frame,
+            fg_color="#25253a",
+            border_color="#f72585",
             border_width=1
         )
-        self.reserva_fecha_entrada.grid(row=3, column=0, padx=10, pady=(5,10), sticky="ew")
+        self.fecha_entrada_entry.grid(row=3, column=0, padx=10, pady=(5,10), sticky="ew")
 
         ctk.CTkLabel(
             form_frame, 
             text="Fecha Salida:", 
             font=("Arial", 14)
         ).grid(row=2, column=1, padx=10, pady=(10,0), sticky="w")
-        
-        self.reserva_fecha_salida = ctk.CTkEntry(
-        form_frame, 
-        fg_color="#25253a", 
-        border_color="#f72585", 
-        border_width=1
+
+        self.fecha_salida_entry = ctk.CTkEntry(
+            form_frame,
+            fg_color="#25253a",
+            border_color="#f72585",
+            border_width=1
         )
-        self.reserva_fecha_salida.grid(row=3, column=1, padx=10, pady=(5,10), sticky="ew")
+        self.fecha_salida_entry.grid(row=3, column=1, padx=10, pady=(5,10), sticky="ew")
+
+        # Crear un frame contenedor para centrar el botón
+        boton_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        boton_frame.grid(row=4, column=0, columnspan=2, pady=(5,10), sticky="ew")
+
+        # Configurar las columnas para centrar el contenido del frame
+        boton_frame.columnconfigure(0, weight=1)
+        boton_frame.columnconfigure(1, weight=1)
+        boton_frame.columnconfigure(2, weight=1)
+
+        # Botón más corto y centrado en la columna 1 del frame
+        ctk.CTkButton(
+            boton_frame,
+            text="Seleccionar Fechas",
+            command=self.abrir_calendario,
+            fg_color="#f72585",
+            hover_color="#fa5c9c",
+            font=("Arial", 14),
+            corner_radius=10,
+            width=200  # Ajusta este valor a lo que prefieras
+        ).grid(row=0, column=1)
 
         # Selector de estrategia de precio (Strategy)
         ctk.CTkLabel(
-        form_frame, 
-        text="Tipo de Precio:", 
-        font=("Arial", 14)
-        ).grid(row=4, column=0, padx=10, pady=(10,0), sticky="w")
+            form_frame, 
+            text="Tipo de Precio:", 
+            font=("Arial", 14)
+        ).grid(row=5, column=0, padx=10, pady=(10,0), sticky="w")
 
         self.tipo_precio = ctk.CTkComboBox(
-        form_frame,
-        values=["Normal", "Con Descuento", "Con IVA"],
-        fg_color="#25253a",
-        border_color="#f72585",
-        border_width=1
+            form_frame,
+            values=["Normal", "Con Descuento", "Con IVA"],
+            fg_color="#25253a",
+            border_color="#f72585",
+            border_width=1
         )
         self.tipo_precio.set("Normal")
-        self.tipo_precio.grid(row=5, column=0, padx=10, pady=(5,10), sticky="ew")
+        self.tipo_precio.grid(row=6, column=0, padx=10, pady=(5,10), sticky="ew")
 
         # Configurar columnas del formulario
         form_frame.columnconfigure(0, weight=1)
@@ -629,27 +637,27 @@ class HotelApp(ctk.CTk):
         btn_frame.pack(pady=10)
 
         ctk.CTkButton(
-        btn_frame,
-        text="📄 Crear Reserva",
-        command=self.crear_reserva,
-        fg_color="#f72585",
-        hover_color="#fa5c9c",
-        font=("Arial", 16),
-        height=50,
-        width=140,
-        corner_radius=15
+            btn_frame,
+            text="📄 Crear Reserva",
+            command=self.crear_reserva,
+            fg_color="#f72585",
+            hover_color="#fa5c9c",
+            font=("Arial", 16),
+            height=50,
+            width=140,
+            corner_radius=15
         ).pack(side="left", padx=10)
 
         ctk.CTkButton(
-        btn_frame,
-        text="🗑 Eliminar Reserva",
-        command=self.eliminar_reserva,
-        fg_color="#f72585",
-        hover_color="#fa5c9c",
-        font=("Arial", 16),
-        height=50,
-        width=140,
-        corner_radius=15
+            btn_frame,
+            text="🗑 Eliminar Reserva",
+            command=self.eliminar_reserva,
+            fg_color="#f72585",
+            hover_color="#fa5c9c",
+            font=("Arial", 16),
+            height=50,
+            width=140,
+            corner_radius=15
         ).pack(side="left", padx=10)
 
         # Tabla de reservas
@@ -670,6 +678,42 @@ class HotelApp(ctk.CTk):
 
         # Llamar al método para actualizar la lista de reservas
         self.actualizar_lista_reservas()
+
+    def abrir_calendario(self):
+        ventana_calendario = ctk.CTkToplevel()
+        ventana_calendario.title("Seleccionar Fechas")
+        ventana_calendario.geometry("600x350")  # Ajusta el tamaño de la ventana
+
+        ctk.CTkLabel(ventana_calendario, text="Fecha Entrada:").grid(row=0, column=0, padx=10, pady=10)
+        calendario_entrada = Calendar(
+            ventana_calendario,
+            date_pattern="yyyy-mm-dd",
+            font=("Arial", 14),  # Aumenta el tamaño de la fuente para mejor visibilidad
+            selectmode="day"
+        )
+        calendario_entrada.grid(row=1, column=0, padx=10, pady=5)
+
+        ctk.CTkLabel(ventana_calendario, text="Fecha Salida:").grid(row=0, column=1, padx=10, pady=10)
+        calendario_salida = Calendar(
+            ventana_calendario,
+            date_pattern="yyyy-mm-dd",
+            font=("Arial", 14),  # Aumenta el tamaño de la fuente para mejor visibilidad
+            selectmode="day"
+        )
+        calendario_salida.grid(row=1, column=1, padx=10, pady=5)
+
+        def confirmar_fechas():
+            fecha_entrada = calendario_entrada.get_date()
+            fecha_salida = calendario_salida.get_date()
+            self.fecha_entrada_entry.delete(0, tk.END)
+            self.fecha_entrada_entry.insert(0, fecha_entrada)
+            self.fecha_salida_entry.delete(0, tk.END)
+            self.fecha_salida_entry.insert(0, fecha_salida)
+            ventana_calendario.destroy()
+
+        ctk.CTkButton(ventana_calendario, text="Confirmar", command=confirmar_fechas).grid(row=2, column=0, columnspan=2, pady=10)
+
+
     
     # Función que obtiene los huéspedes para el combobox, asegurándonos de que devuelvan tanto el nombre como el rut
     def obtener_huespedes_combobox(self):
@@ -724,11 +768,9 @@ class HotelApp(ctk.CTk):
             if not huesped:
                 raise ValueError(f"El huésped con rut {huesped_rut} no existe")
             
-            
-            
             # Obtener las fechas
-            fecha_entrada = datetime.strptime(self.reserva_fecha_entrada.get(), "%Y-%m-%d")
-            fecha_salida = datetime.strptime(self.reserva_fecha_salida.get(), "%Y-%m-%d")
+            fecha_entrada = datetime.strptime(self.fecha_entrada_entry.get(), "%Y-%m-%d")
+            fecha_salida = datetime.strptime(self.fecha_salida_entry.get(), "%Y-%m-%d")
             
             if fecha_entrada >= fecha_salida:
                 raise ValueError("La fecha de salida debe ser posterior a la fecha de entrada")
