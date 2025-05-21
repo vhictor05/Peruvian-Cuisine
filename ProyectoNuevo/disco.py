@@ -10,6 +10,7 @@ from tkcalendar import Calendar, DateEntry
 import tkinter as tk
 from fpdf import FPDF
 from crud.trago_crud import TragoCRUD
+from facade.discoteca_facade import DiscotecaFacade
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
@@ -24,6 +25,8 @@ class DiscotecaApp(ctk.CTk):
         self.geometry("1200x700")
         self.configure(fg_color="#1e1e2d")
         self.db: Session = next(get_db())
+        self.facade = DiscotecaFacade(self.db)
+
 
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -216,7 +219,7 @@ class DiscotecaApp(ctk.CTk):
                 "aforo_maximo": int(self.evento_aforo.get())
             }
             
-            EventoCRUD.crear(self.db, evento_data)
+            self.facade.registrar_evento(evento_data)            
             messagebox.showinfo("Éxito", "Evento registrado")
             self.actualizar_lista_eventos()
             
@@ -225,7 +228,9 @@ class DiscotecaApp(ctk.CTk):
 
     def actualizar_lista_eventos(self):
         self.evento_tree.delete(*self.evento_tree.get_children())
-        for e in EventoCRUD.obtener_todos(self.db):
+        for e in self.facade.listar_eventos():
+
+
             self.evento_tree.insert("", "end", values=(e.id, e.nombre, e.fecha, e.precio_entrada, e.aforo_maximo))
 
     # ===== CLIENTES =====
@@ -287,7 +292,8 @@ class DiscotecaApp(ctk.CTk):
                 "email": self.cliente_email.get(),
                 "telefono": self.cliente_telefono.get()
             }
-            ClienteDiscotecaCRUD.crear(self.db, cliente_data)
+            self.facade.registrar_cliente(cliente_data)
+
             messagebox.showinfo("Éxito", "Cliente registrado")
             self.actualizar_lista_clientes()
         except Exception as e:
@@ -295,7 +301,7 @@ class DiscotecaApp(ctk.CTk):
 
     def actualizar_lista_clientes(self):
         self.cliente_tree.delete(*self.cliente_tree.get_children())
-        for c in ClienteDiscotecaCRUD.obtener_todos(self.db):
+        for c in self.facade.listar_clientes():
             self.cliente_tree.insert("", "end", values=(c.id, c.nombre, c.rut, c.email or "", c.telefono or ""))
 
     def create_treeview(self, columns):
@@ -547,7 +553,8 @@ class DiscotecaApp(ctk.CTk):
         for item in self.trago_tree.get_children():
             self.trago_tree.delete(item)
             
-        tragos = TragoCRUD.obtener_todos(self.db)
+        tragos = self.facade.listar_tragos()
+
         for trago in tragos:
             self.trago_tree.insert("", "end", values=(
                 trago.id,
@@ -558,7 +565,8 @@ class DiscotecaApp(ctk.CTk):
             ))
 
     def obtener_tragos_combobox(self):
-        tragos = TragoCRUD.obtener_todos(self.db)
+        tragos = self.facade.listar_tragos()
+
         return [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
 
     def agregar_trago_pedido(self):
@@ -572,7 +580,8 @@ class DiscotecaApp(ctk.CTk):
             
             # Extraer nombre del trago
             trago_nombre = trago_str.split(" ($")[0]
-            trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+            trago = self.facade.obtener_trago_por_nombre(trago_nombre)
+
             
             if not trago:
                 messagebox.showerror("Error", "Trago no encontrado")
@@ -630,7 +639,8 @@ class DiscotecaApp(ctk.CTk):
         try:
             # Obtener RUT del cliente
             cliente_rut = cliente_str.split("(")[-1].rstrip(")")
-            cliente = ClienteDiscotecaCRUD.obtener_por_rut(self.db, cliente_rut)
+            cliente = self.facade.obtener_cliente_por_rut(cliente_rut)
+
             
             if not cliente:
                 messagebox.showerror("Error", "Cliente no encontrado")
@@ -643,7 +653,8 @@ class DiscotecaApp(ctk.CTk):
                 trago_nombre = values[0]
                 cantidad = int(values[1])
                 
-                trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+                trago = self.facade.obtener_trago_por_nombre(trago_nombre)
+
                 detalles[trago.id] = cantidad
             
             # Calcular total
@@ -653,12 +664,7 @@ class DiscotecaApp(ctk.CTk):
             )
             
             # Crear pedido
-            pedido = PedidoTrago(
-                cliente_id=cliente.id,
-                total=total,
-                detalles=detalles,
-                estado="Confirmado"
-            )
+            pedido = self.facade.crear_pedido(cliente.id, total, detalles)
             
             self.db.add(pedido)
             self.db.commit()
@@ -673,7 +679,8 @@ class DiscotecaApp(ctk.CTk):
             messagebox.showerror("Error", f"No se pudo completar el pedido: {str(e)}")
 
     def actualizar_lista_tragos_combobox(self):
-        tragos = TragoCRUD.obtener_todos(self.db)
+        tragos = self.facade.listar_tragos()
+
         valores = [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
         self.trago_seleccionado.configure(values=valores)
 
@@ -681,32 +688,36 @@ class DiscotecaApp(ctk.CTk):
         trago_str = self.trago_seleccionado.get()
         if trago_str:
             trago_nombre = trago_str.split(" ($")[0]
-            trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+            trago = self.facade.obtener_trago_por_nombre(trago_nombre)
+
             if trago:
                 self.trago_precio.delete(0, "end")
                 self.trago_precio.insert(0, str(trago.precio))
                 self.trago_disponible.select() if trago.disponible else self.trago_disponible.deselect()
 
-    def actualizar_precio_trago(self):
+    def actualizar_precio_trago(self): 
         try:
             trago_str = self.trago_seleccionado.get()
             nuevo_precio = float(self.trago_precio.get())
-            
+
             if not trago_str:
                 messagebox.showwarning("Advertencia", "Seleccione un trago primero")
                 return
-                
+
             trago_nombre = trago_str.split(" ($")[0]
-            trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
-            
+            trago = self.facade.obtener_trago_por_nombre(trago_nombre)
+
             if trago:
-                TragoCRUD.actualizar_precio(self.db, trago.id, nuevo_precio)
+                self.facade.actualizar_precio_trago(trago.id, nuevo_precio)
                 messagebox.showinfo("Éxito", "Precio actualizado correctamente")
                 self.actualizar_lista_tragos()
                 self.actualizar_lista_tragos_combobox()
                 self.actualizar_lista_tragos_combo()  # Para la pestaña de pedidos
+            else:
+                messagebox.showerror("Error", "Trago no encontrado")
         except ValueError:
             messagebox.showerror("Error", "Ingrese un precio válido")
+
 
     def cambiar_disponibilidad_trago(self):
         trago_str = self.trago_seleccionado.get()
@@ -715,7 +726,8 @@ class DiscotecaApp(ctk.CTk):
             return
             
         trago_nombre = trago_str.split(" ($")[0]
-        trago = self.db.query(Trago).filter(Trago.nombre == trago_nombre).first()
+        trago = self.facade.obtener_trago_por_nombre(trago_nombre)
+
         
         if trago:
             nueva_disponibilidad = self.trago_disponible.get()
@@ -815,13 +827,15 @@ class DiscotecaApp(ctk.CTk):
         self.lista_clientes.set("")
 
     def actualizar_lista_tragos_combo(self):
-        tragos = TragoCRUD.obtener_todos(self.db)
+        tragos = self.facade.listar_tragos()
+
         valores = [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
         self.lista_tragos.configure(values=valores)
 
     def filtrar_tragos(self, event):
         busqueda = self.busqueda_trago.get().lower()
-        tragos = TragoCRUD.obtener_todos(self.db)
+        tragos = self.facade.listar_tragos()
+
         
         if busqueda:
             filtrados = [f"{t.nombre} (${t.precio:.2f})" for t in tragos 
