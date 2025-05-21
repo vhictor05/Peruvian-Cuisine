@@ -6,11 +6,9 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from hotel_database import get_db, Base, recreate_db, engine
 from models_folder.models_hotel import Huesped, Habitacion, Reserva
-from crud.huesped_crud import HuespedCRUD
-from crud.habitacion_crud import HabitacionCRUD
-from crud.reserva_crud import ReservaCRUD
 from datetime import datetime, timedelta
 from tkcalendar import DateEntry, Calendar
+from hotel_facade import HotelFacade
 
 # ===== ESTRATEGIA DE PRECIO =====
 from abc import ABC, abstractmethod
@@ -43,8 +41,9 @@ class HotelApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Hotel")
-        self.geometry("900x650")
+        self.geometry("1000x650")
         self.db = next(get_db())
+        self.hotel_facade = HotelFacade(self.db)
         self.configure(fg_color="#1e1e2d", corner_radius=15)
         
         # Configurar el estilo del Treeview al inicio
@@ -278,39 +277,13 @@ class HotelApp(ctk.CTk):
         email = self.huesped_email.get().strip()
         telefono = self.huesped_telefono.get().strip()
 
-        # Validar nombre solo letras y espacios
-        if not re.match(r'^[A-Za-z\s]+$', nombre):
-            messagebox.showerror("Error", "El nombre solo debe contener letras y espacios")
-            return
-
-        # Validar RUT formato xx.xxx.xxx-(digito verificador)
-        if not re.match(r'^\d{2}\.\d{3}\.\d{3}-[\dkK]$', rut):
-            messagebox.showerror("Error", "El RUT debe tener formato xx.xxx.xxx-x (dígito verificador 0-9 o k)")
-            return
-
-        # Validar email que termine en @gmail.com
-        if not re.match(r'^[\w\.-]+@gmail\.com$', email):
-            messagebox.showerror("Error", "El email debe tener formato válido y terminar en @gmail.com")
-            return
-
-        # Validar teléfono exactamente 9 dígitos numéricos
-        if not (telefono.isdigit() and len(telefono) == 9):
-            messagebox.showerror("Error", "El teléfono debe contener exactamente 9 dígitos numéricos")
-            return
-
-        # Si todo ok, crear huésped
         try:
-            HuespedCRUD.crear_huesped(
-                self.db,
-                nombre=nombre,
-                rut=rut,
-                email=email,
-                telefono=telefono
-            )
+            self.hotel_facade.crear_huesped(nombre, rut, email, telefono)
             messagebox.showinfo("Éxito", "Huésped registrado correctamente")
             self.actualizar_lista_huespedes()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo registrar: {str(e)}")
+        
 
     # ===== PANEL HABITACIONES =====
     def show_habitaciones(self):
@@ -405,6 +378,18 @@ class HotelApp(ctk.CTk):
             width=140,
             corner_radius=15
         ).pack(side="left", padx=10)
+        
+        ctk.CTkButton(
+            btn_frame,
+            text="🗑 Eliminar",
+            command=self.eliminar_habitacion,
+            fg_color="#f72585",
+            hover_color="#fa5c9c",
+            font=("Arial", 16),
+            height=50,
+            width=140,
+            corner_radius=15
+        ).pack(side="left", padx=10)
 
         # Tabla de habitaciones
         columns = ["ID", "Número", "Tipo", "Precio", "Disponible"]
@@ -417,6 +402,9 @@ class HotelApp(ctk.CTk):
                 self.habitacion_tree.column(col, width=100)
 
         self.habitacion_tree.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        self.habitacion_tree.bind("<<TreeviewSelect>>", self.cargar_datos_habitacion)
+
 
         # Configurar las columnas del main_frame para que la tabla se expanda
         self.main_frame.columnconfigure(1, weight=1)
@@ -428,40 +416,30 @@ class HotelApp(ctk.CTk):
     def registrar_habitacion(self):
         # Obtener los valores ingresados en los campos
         numero = self.habitacion_numero.get()
-        tipo = self.habitacion_tipo.get()
-        precio = self.habitacion_precio.get()
+        tipo = self.habitacion_tipo.get().strip().capitalize()
+        precio = self.habitacion_precio.get().strip()
 
-        # Validar que todos los campos estén completos
-        if not numero or not tipo or not precio:
+        if not all([numero, tipo, precio]):
             messagebox.showerror("Error", "Todos los campos son obligatorios")
             return
 
         try:
-            precio = float(precio)  # Convertir el precio a tipo flotante
-            HabitacionCRUD.crear_habitacion(
-                self.db, 
-                numero=numero, 
-                tipo=tipo, 
-                precio=precio
-            )
+            precio = float(precio)
+            self.hotel_facade.crear_habitacion(numero, tipo, precio)
             messagebox.showinfo("Éxito", "Habitación registrada correctamente")
-            self.actualizar_lista_habitaciones()  # Actualizar la lista de habitaciones
-        except ValueError:
-            messagebox.showerror("Error", "Precio debe ser un número válido")
+            self.actualizar_lista_habitaciones()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo registrar la habitación: {str(e)}")
-
+    
+    # Método para modificar habitación
     def modificar_habitacion(self):
-        # Obtener la habitación seleccionada en el TreeView
         selected_item = self.habitacion_tree.selection()
         if not selected_item:
             messagebox.showwarning("Advertencia", "Seleccione una habitación para modificar")
             return
 
-        # Obtener los valores de la habitación seleccionada
         habitacion_id = self.habitacion_tree.item(selected_item, "values")[0]
 
-        # Obtener los nuevos valores del formulario
         numero = self.habitacion_numero.get()
         tipo = self.habitacion_tipo.get()
         precio = self.habitacion_precio.get()
@@ -472,22 +450,14 @@ class HotelApp(ctk.CTk):
             return
 
         try:
-            precio = float(precio)  # Convertir el precio a tipo flotante
-            HabitacionCRUD.modificar_habitacion(
-                self.db,
-                habitacion_id=habitacion_id,
-                numero=numero,
-                tipo=tipo,
-                precio=precio,
-                disponible=disponible
-            )
+            precio = float(precio)
+            self.hotel_facade.modificar_habitacion(habitacion_id, numero, tipo, precio, disponible)
             messagebox.showinfo("Éxito", "Habitación modificada correctamente")
-            self.actualizar_lista_habitaciones()  # Actualizar la lista de habitaciones
-        except ValueError:
-            messagebox.showerror("Error", "Precio debe ser un número válido")
+            self.actualizar_lista_habitaciones()
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo modificar la habitación: {str(e)}")
-
+            messagebox.showerror("Error", f"No se pudo modificar la habitación: {str(e)}")    
+        
+    
     def actualizar_lista_habitaciones(self):
         # Verificar si el TreeView está disponible
         if not hasattr(self, 'habitacion_tree') or not self.habitacion_tree.winfo_exists():
@@ -514,6 +484,25 @@ class HotelApp(ctk.CTk):
                 "Sí" if hab.disponible else "No"
             ))
 
+    def cargar_datos_habitacion(self, event=None):
+        selected_item = self.habitacion_tree.selection()
+        if not selected_item:
+            return
+
+        valores = self.habitacion_tree.item(selected_item, "values")
+        habitacion_id, numero, tipo, precio, disponible = valores
+
+        self.habitacion_numero.delete(0, tk.END)
+        self.habitacion_numero.insert(0, numero)
+
+        self.habitacion_tipo.set(tipo)
+
+        # Eliminar símbolo $ y convertir a formato editable
+        precio_valor = precio.replace("$", "").replace(",", "")
+        self.habitacion_precio.delete(0, tk.END)
+        self.habitacion_precio.insert(0, precio_valor)
+
+    
     # ===== PANEL RESERVAS =====
     def show_reservas(self):
         self.clear_main_frame()
@@ -647,6 +636,18 @@ class HotelApp(ctk.CTk):
             width=140,
             corner_radius=15
         ).pack(side="left", padx=10)
+        
+        ctk.CTkButton(
+            btn_frame,
+            text="📝 Modificar Reserva",
+            command=self.modificar_reserva,
+            fg_color="#f72585",
+            hover_color="#fa5c9c",
+            font=("Arial", 16),
+            height=50,
+            width=180,
+            corner_radius=15
+        ).pack(side="left", padx=10)
 
         ctk.CTkButton(
             btn_frame,
@@ -661,7 +662,7 @@ class HotelApp(ctk.CTk):
         ).pack(side="left", padx=10)
 
         # Tabla de reservas
-        columns = ["ID", "Huésped", "Habitación", "Entrada", "Salida", "Estado"]
+        columns = ["ID", "Huésped", "Numero", "Tipo", "Precio", "Entrada", "Salida", "Estado"]
         self.reserva_tree = ttk.Treeview(self.main_frame, columns=columns, show="headings", height=10)
         for col in columns:
             self.reserva_tree.heading(col, text=col)
@@ -732,69 +733,61 @@ class HotelApp(ctk.CTk):
         except Exception as e:
             print(f"Error al acceder al TreeView: {e}")
             return
-        
+
         # Limpiar los elementos del TreeView
         for item in self.reserva_tree.get_children():
             self.reserva_tree.delete(item)
-        
+
         # Obtener todas las reservas de la base de datos
         reservas = self.db.query(Reserva).all()
         if not reservas:
             print("No se encontraron reservas en la base de datos.")
-        
+
         # Insertar cada reserva en el TreeView
         for res in reservas:
-            print(f"Insertando reserva: {res.id}, {res.huesped.nombre}, {res.habitacion.numero}")
-            self.reserva_tree.insert("", "end", values=(res.id, res.huesped.nombre, res.habitacion.numero, res.fecha_entrada.strftime("%Y-%m-%d"), res.fecha_salida.strftime("%Y-%m-%d"), res.estado))
+            try:
+                print(f"Insertando reserva: {res.id}, {res.huesped.nombre}, {res.habitacion.numero}")
+                self.reserva_tree.insert("", "end", values=(
+                    res.id,
+                    res.huesped.nombre if res.huesped else "",
+                    res.habitacion.numero if res.habitacion else "",
+                    res.habitacion.tipo if res.habitacion else "",
+                    f"${res.habitacion.precio:.2f}" if res.habitacion else "",
+                    res.fecha_entrada.strftime("%Y-%m-%d"),
+                    res.fecha_salida.strftime("%Y-%m-%d"),
+                    res.estado
+                ))
+            except Exception as e:
+                print(f"Error insertando reserva ID {res.id}: {e}")
 
 
-    # Al momento de crear la reserva, extraemos el rut
+    # Método para crear reserva
     def crear_reserva(self):
         try:
-            # Obtener el tipo de habitación seleccionado desde el combobox
-            habitacion_tipo = self.habitacion_tipo.get()  # Aquí obtenemos el tipo de habitación seleccionado
-            print(f"Tipo de habitación seleccionado: '{habitacion_tipo}'")  # Imprimir para verificar
-
-            # Obtener el huésped seleccionado desde el combobox
-            huesped_info = self.reserva_huesped.get()  # Obtener el valor completo (Nombre (Rut))
-            print(f"Huésped completo: {huesped_info}")  # Imprimir para verificar
-
-            # Extraer el rut del huésped del formato "Nombre (Rut)"
-            huesped_rut = huesped_info.split("(")[-1].rstrip(")")  # Extraemos solo el rut
-            print(f"Huésped seleccionado: {huesped_rut}")  # Imprimir para verificar
-
-            # Buscar el huésped en la base de datos utilizando el rut
-            huesped = self.db.query(Huesped).filter(Huesped.rut == huesped_rut).first()
+            huesped_info = self.reserva_huesped.get()
+            huesped_rut = huesped_info.split("(")[-1].rstrip(")")
+            huesped = self.hotel_facade.obtener_huesped_por_rut(huesped_rut)
             if not huesped:
                 raise ValueError(f"El huésped con rut {huesped_rut} no existe")
-            
-            # Obtener las fechas
+
             fecha_entrada = datetime.strptime(self.fecha_entrada_entry.get(), "%Y-%m-%d")
             fecha_salida = datetime.strptime(self.fecha_salida_entry.get(), "%Y-%m-%d")
-            
             if fecha_entrada >= fecha_salida:
                 raise ValueError("La fecha de salida debe ser posterior a la fecha de entrada")
-            
-            # Buscar habitaciones disponibles del tipo seleccionado
+
+            habitacion_tipo = self.habitacion_tipo.get()
             habitaciones_disponibles = self.db.query(Habitacion).filter(
                 Habitacion.tipo == habitacion_tipo,
                 Habitacion.disponible == True
-            ).first()  # Obtener solo la primera habitación disponible
-
-            # Si no se encuentra una habitación disponible de ese tipo, buscar una habitación de cualquier tipo
+            ).first()
             if not habitaciones_disponibles:
                 habitaciones_disponibles = self.db.query(Habitacion).filter(
-                Habitacion.disponible == True
+                    Habitacion.disponible == True
                 ).first()
-
-            # Si no hay habitaciones disponibles en general, lanzar error
             if not habitaciones_disponibles:
-             raise ValueError("No hay habitaciones disponibles en este momento")
+                raise ValueError("No hay habitaciones disponibles en este momento")
 
-
-            # === Aplicar estrategia de precio dinámica según selección ===
             tipo = self.tipo_precio.get()
-
             if tipo == "Normal":
                 estrategia = PrecioNormal()
             elif tipo == "Con Descuento":
@@ -807,27 +800,60 @@ class HotelApp(ctk.CTk):
             precio_final = estrategia.calcular_precio(habitaciones_disponibles.precio)
             messagebox.showinfo("Precio final", f"Precio final de la habitación: ${precio_final:.2f}")
 
-            # Crear la reserva
-            ReservaCRUD.crear_reserva(
-            self.db,
-            huesped_id=huesped.id,
-            habitacion_id=habitaciones_disponibles.id,
-            fecha_entrada=fecha_entrada,
-            fecha_salida=fecha_salida
-            )
-            
-            # Actualizar disponibilidad de la habitación
+            self.hotel_facade.crear_reserva(huesped.id, habitaciones_disponibles.id, fecha_entrada, fecha_salida)
+
             habitaciones_disponibles.disponible = False
             self.db.commit()
-            
+
             messagebox.showinfo("Éxito", "Reserva creada correctamente")
-            
-            if hasattr(self, 'reserva_tree') and self.reserva_tree.winfo_exists():
-                self.actualizar_lista_reservas()
-            
+            self.actualizar_lista_reservas()
+
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo crear la reserva: {str(e)}")
+    
+    def modificar_reserva(self):
+        selected_item = self.reserva_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione una reserva para modificar")
+            return
 
+        reserva_id = self.reserva_tree.item(selected_item, "values")[0]
+
+        try:
+            huesped_info = self.reserva_huesped.get()
+            huesped_rut = huesped_info.split("(")[-1].rstrip(")")
+            huesped = self.hotel_facade.obtener_huesped_por_rut(huesped_rut)
+            if not huesped:
+                raise ValueError(f"Huésped con RUT {huesped_rut} no existe")
+
+            fecha_entrada = datetime.strptime(self.fecha_entrada_entry.get(), "%Y-%m-%d")
+            fecha_salida = datetime.strptime(self.fecha_salida_entry.get(), "%Y-%m-%d")
+            if fecha_entrada >= fecha_salida:
+                raise ValueError("La fecha de salida debe ser posterior a la de entrada")
+
+            habitacion_tipo = self.habitacion_tipo.get()
+            habitacion = self.db.query(Habitacion).filter(
+                Habitacion.tipo == habitacion_tipo,
+                Habitacion.disponible == True
+            ).first()
+            if not habitacion:
+                raise ValueError("No hay habitaciones disponibles para ese tipo")
+
+            self.hotel_facade.actualizar_reserva(
+                reserva_id,
+                huesped_id=huesped.id,
+                habitacion_id=habitacion.id,
+                fecha_entrada=fecha_entrada,
+                fecha_salida=fecha_salida
+            )
+
+            messagebox.showinfo("Éxito", "Reserva modificada correctamente")
+            self.actualizar_lista_reservas()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo modificar la reserva: {str(e)}")
+
+    
     def eliminar_reserva(self):
         # Obtener la reserva seleccionada en el TreeView
         selected_item = self.reserva_tree.selection()
@@ -844,7 +870,7 @@ class HotelApp(ctk.CTk):
             return
 
         try:
-            ReservaCRUD.eliminar_reserva(self.db, reserva_id=int(reserva_id))
+            self.hotel_facade.eliminar_reserva(self.db, reserva_id=int(reserva_id))
             messagebox.showinfo("Éxito", "Reserva eliminada correctamente")
             if hasattr(self, 'reserva_tree') and self.reserva_tree.winfo_exists():
                 self.actualizar_lista_reservas()
@@ -899,8 +925,7 @@ class HotelApp(ctk.CTk):
             return
             
         try:
-            HuespedCRUD.crear_huesped(
-                self.db,
+            self.hotel_facade.crear_huesped(
                 nombre=nombre,
                 rut=rut,
                 email=self.huesped_email.get() or None,
@@ -917,7 +942,7 @@ class HotelApp(ctk.CTk):
             messagebox.showwarning("Advertencia", "Ingrese un RUT para buscar")
             return
             
-        huesped = HuespedCRUD.obtener_huesped_por_rut(self.db, rut)
+        huesped = self.hotel_facade.obtener_huesped_por_rut(self.db, rut)
         if huesped:
             self.huesped_nombre.delete(0, "end")
             self.huesped_nombre.insert(0, huesped.nombre)
@@ -940,9 +965,9 @@ class HotelApp(ctk.CTk):
             return
             
         try:
-            precio = float(precio)
-            HabitacionCRUD.crear_habitacion(
-                self.db,
+            precio_str = self.habitacion_precio.get().replace(".", "").replace(",", ".")
+            precio = float(precio_str)
+            self.hotel_facade.crear_habitacion(
                 numero=numero,
                 tipo=tipo,
                 precio=precio
@@ -976,8 +1001,7 @@ class HotelApp(ctk.CTk):
 
         try:
             precio = float(precio)
-            HabitacionCRUD.modificar_habitacion(
-                self.db,
+            self.hotel_facade.modificar_habitacion(
                 habitacion_id=habitacion_id,
                 numero=numero,
                 tipo=tipo,
@@ -990,6 +1014,25 @@ class HotelApp(ctk.CTk):
             messagebox.showerror("Error", "Precio debe ser un número válido")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo modificar la habitación: {str(e)}")
+
+    def eliminar_habitacion(self):
+        selected_item = self.habitacion_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione una habitación para eliminar")
+            return
+
+        habitacion_id = self.habitacion_tree.item(selected_item, "values")[0]
+
+        confirmar = messagebox.askyesno("Confirmar", "¿Estás seguro de que quieres eliminar esta habitación?")
+        if not confirmar:
+            return
+
+        try:
+            self.hotel_facade.eliminar_habitacion(habitacion_id)
+            messagebox.showinfo("Éxito", "Habitación eliminada correctamente")
+            self.actualizar_lista_habitaciones()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo eliminar la habitación: {str(e)}")
 
 if __name__ == "__main__":
     app = HotelApp()

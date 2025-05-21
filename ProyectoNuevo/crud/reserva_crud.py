@@ -1,17 +1,31 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
-from models_folder.models_hotel import Reserva, Habitacion
+from models_folder.models_hotel import Reserva, Habitacion, Huesped
 from sqlalchemy import and_
 
 class ReservaCRUD:
     @staticmethod
     def crear_reserva(db: Session, huesped_id: int, habitacion_id: int, 
                       fecha_entrada: datetime, fecha_salida: datetime):
-        # Verificar disponibilidad de la habitación
+        # Validar fechas
+        if fecha_entrada >= fecha_salida:
+            raise ValueError("La fecha de entrada debe ser anterior a la fecha de salida")
+        if fecha_entrada < datetime.now():
+            raise ValueError("La fecha de entrada no puede ser en el pasado")
+
+        # Validar existencia de huésped y habitación
+        huesped = db.query(Huesped).filter(Huesped.id == huesped_id).first()
+        if not huesped:
+            raise ValueError("El huésped no existe")
+
+        habitacion = db.query(Habitacion).filter(Habitacion.id == habitacion_id).first()
+        if not habitacion:
+            raise ValueError("La habitación no existe")
+
+        # Verificar disponibilidad
         if not ReservaCRUD.habitacion_disponible(db, habitacion_id, fecha_entrada, fecha_salida):
             raise ValueError("La habitación no está disponible en esas fechas")
-        
-        # Crear la nueva reserva
+
         reserva = Reserva(
             huesped_id=huesped_id,
             habitacion_id=habitacion_id,
@@ -19,48 +33,38 @@ class ReservaCRUD:
             fecha_salida=fecha_salida,
             estado="Confirmada"
         )
-        db.add(reserva)
-        db.commit()
+        try:
+            db.add(reserva)
+            db.commit()
 
-        # Cambiar el estado de la habitación a no disponible
-        habitacion = db.query(Habitacion).filter(Habitacion.id == habitacion_id).first()
-        
-        # Verificar que la habitación existe y actualizar su disponibilidad
-        if habitacion:
-            if habitacion.disponible:  # Solo actualizar si está disponible
+            # Cambiar estado habitación a no disponible
+            if habitacion.disponible:
                 habitacion.disponible = False
                 db.commit()
             else:
                 raise ValueError("La habitación ya está ocupada o no está disponible en este momento")
-        else:
-            raise ValueError("La habitación no existe en la base de datos")
 
-        return reserva
-    
+            return reserva
+        except Exception as e:
+            db.rollback()
+            raise e
+
     @staticmethod
     def habitacion_disponible(db: Session, habitacion_id: int, 
                             fecha_entrada: datetime, fecha_salida: datetime) -> bool:
-        """
-        Verifica si una habitación está disponible en el rango de fechas solicitado.
-        """
-        # Consultar si ya existe alguna reserva confirmada en el rango de fechas
         reserva_existente = db.query(Reserva).filter(
             Reserva.habitacion_id == habitacion_id,
             and_(
-                Reserva.fecha_entrada < fecha_salida,  # Verificar que la entrada solicitada sea antes de la salida existente
-                Reserva.fecha_salida > fecha_entrada   # Verificar que la salida solicitada sea después de la entrada existente
+                Reserva.fecha_entrada < fecha_salida,
+                Reserva.fecha_salida > fecha_entrada
             ),
-            Reserva.estado == "Confirmada"  # Solo considerar reservas confirmadas
+            Reserva.estado == "Confirmada"
         ).first()
 
-        print(f"Verificando disponibilidad de la habitación {habitacion_id}: {'Disponible' if reserva_existente is None else 'No disponible'}")
-
-        return reserva_existente is None  # Si no hay reservas existentes, la habitación está disponible
-
+        return reserva_existente is None
 
     @staticmethod
     def obtener_reservas_activas(db: Session):
-        """Obtiene todas las reservas activas (que están dentro del rango de fechas actual)."""
         hoy = datetime.now()
         return db.query(Reserva).filter(
             Reserva.fecha_entrada <= hoy,
@@ -70,12 +74,28 @@ class ReservaCRUD:
 
     @staticmethod
     def eliminar_reserva(db: Session, reserva_id: int):
-        """Elimina una reserva por su ID."""
-        # Buscar la reserva por ID
         reserva = db.query(Reserva).filter(Reserva.id == reserva_id).first()
         if not reserva:
             raise ValueError("La reserva no existe")
-        
-        # Eliminar la reserva
-        db.delete(reserva)
-        db.commit()
+        try:
+            db.delete(reserva)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise e
+
+    @staticmethod
+    def actualizar_reserva(db: Session, reserva_id: int, **kwargs):
+        reserva = db.query(Reserva).filter(Reserva.id == reserva_id).first()
+        if not reserva:
+            raise ValueError("Reserva no encontrada")
+
+        try:
+            for key, value in kwargs.items():
+                setattr(reserva, key, value)
+            db.commit()
+            return reserva
+        except Exception as e:
+            db.rollback()
+            raise e
+
