@@ -1128,7 +1128,7 @@ class MenuPanel(ctk.CTkFrame):
         if not selected_item:
             messagebox.showerror("Error", "Selecciona un ingrediente de la lista.")
             return
-
+        
         self.ingredientes_list.delete(selected_item)
 
     def get_ingredientes_from_list(self):
@@ -1580,8 +1580,8 @@ class PanelCompra(ctk.CTkFrame):
             frame, 
             corner_radius=5,
             fg_color="#25253a",
-            border_color="#4361ee",
-            border_width=1,
+            border_color="#4361ee", 
+            border_width=1, 
             height=30
         )
         entry.grid(row=0, column=1, padx=10)
@@ -2077,43 +2077,67 @@ class GraficosPanel(ctk.CTkFrame):
 
     def graficar_uso_ingredientes(self):
         graficar_uso_ingredientes(self.db)
-class Generarboleta:
-    def __init__(self, pedido, db):
+class BoletaBuilder:
+    """Builder para construir boletas PDF paso a paso"""
+    
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        """Reinicia el builder para construir una nueva boleta"""
+        self.pdf = FPDF()
+        self.pedido = None
+        self.db = None
+        return self
+    
+    def set_pedido(self, pedido):
+        """Establece el pedido para la boleta"""
         self.pedido = pedido
+        return self
+    
+    def set_database(self, db):
+        """Establece la base de datos"""
         self.db = db
-
-    def generar_boleta(self):
-        if not self.pedido.menus:
-            messagebox.showwarning("Pedido Vacío", "No hay menús en el pedido para generar la boleta.")
-            return
-
-        # Crear una instancia de FPDF
-        pdf = FPDF()
-        pdf.add_page()
-
-        # Encabezado de la boleta
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(200, 10, "Boleta Restaurante bakano", ln=True, align="C")
-        pdf.ln(10)
-
-        # Detalles del restaurante (se pueden personalizar)
-        pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, "Razón Social del Negocio mas bakano:", ln=True)
-        pdf.cell(0, 10, "RUT: 66.999.666-9", ln=True)
-        pdf.cell(0, 10, "Dirección: Calle Falsa 123", ln=True)
-        pdf.cell(0, 10, "Teléfono:+56 9 1234 5678", ln=True)
-        pdf.ln(10)
-
-        # Detalles del pedido
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(50, 10, "Nombre", 1)
-        pdf.cell(30, 10, "Cantidad", 1)
-        pdf.cell(50, 10, "Precio Unitario", 1)
-        pdf.cell(50, 10, "Subtotal", 1)
-        pdf.ln()
-
-        pdf.set_font("Arial", size=12)
-
+        return self
+    
+    def add_page(self):
+        """Añade una nueva página al PDF"""
+        self.pdf.add_page()
+        return self
+    
+    def build_header(self):
+        """Construye el encabezado de la boleta"""
+        self.pdf.set_font("Arial", "B", 16)
+        self.pdf.cell(200, 10, "Boleta Restaurante bakano", ln=True, align="C")
+        self.pdf.ln(10)
+        return self
+    
+    def build_restaurant_info(self):
+        """Construye la información del restaurante"""
+        self.pdf.set_font("Arial", size=12)
+        self.pdf.cell(0, 10, "Razón Social del Negocio mas bakano:", ln=True)
+        self.pdf.cell(0, 10, "RUT: 66.999.666-9", ln=True)
+        self.pdf.cell(0, 10, "Dirección: Calle Falsa 123", ln=True)
+        self.pdf.cell(0, 10, "Teléfono:+56 9 1234 5678", ln=True)
+        self.pdf.ln(10)
+        return self
+    
+    def build_table_header(self):
+        """Construye el encabezado de la tabla de productos"""
+        self.pdf.set_font("Arial", "B", 12)
+        self.pdf.cell(50, 10, "Nombre", 1)
+        self.pdf.cell(30, 10, "Cantidad", 1)
+        self.pdf.cell(50, 10, "Precio Unitario", 1)
+        self.pdf.cell(50, 10, "Subtotal", 1)
+        self.pdf.ln()
+        return self
+    
+    def build_menu_items(self):
+        """Construye los elementos del menú en la tabla"""
+        if not self.pedido or not self.pedido.menus:
+            return self
+        
+        self.pdf.set_font("Arial", size=12)
         menuses = {}
         
         for menu in self.pedido.menus:
@@ -2122,39 +2146,142 @@ class Generarboleta:
                 menuses[menu_obj.nombre]['cantidad'] += menu["cantidad"]
                 menuses[menu_obj.nombre]['precio_total'] += menu_obj.precio * menu["cantidad"]
             else:
-                menuses[menu_obj.nombre] = {'cantidad': menu["cantidad"], 'precio_total': menu_obj.precio * menu["cantidad"]}
+                menuses[menu_obj.nombre] = {
+                    'cantidad': menu["cantidad"], 
+                    'precio_total': menu_obj.precio * menu["cantidad"]
+                }
 
         for menu, datos in menuses.items():
-            pdf.cell(50, 10, menu, 1)
-            pdf.cell(30, 10, str(datos['cantidad']), 1)
-            pdf.cell(50, 10, f"${datos['precio_total'] / datos['cantidad']:.2f}", 1)
-            pdf.cell(50, 10, f"${datos['precio_total']:.2f}", 1)
-            pdf.ln()
-
+            self.pdf.cell(50, 10, menu, 1)
+            self.pdf.cell(30, 10, str(datos['cantidad']), 1)
+            self.pdf.cell(50, 10, f"${datos['precio_total'] / datos['cantidad']:.2f}", 1)
+            self.pdf.cell(50, 10, f"${datos['precio_total']:.2f}", 1)
+            self.pdf.ln()
+        
+        return self
+    
+    def build_totals(self):
+        """Construye la sección de totales"""
+        if not self.pedido:
+            return self
+        
         total = self.pedido.total
         iva = total * 0.19
         total_con_iva = total + iva
         
-        # Mostrar subtotales y totales
-        pdf.set_font("Arial", "B",12)
-        pdf.cell(0, 10, f"Subtotal: ${total:.2f}", 0, 1, "R")
-        pdf.cell(0, 10, f"IVA (19%): ${iva:.2f}", 0, 1, "R")
-        pdf.cell(0, 10, f"Total: ${total_con_iva:.2f}", 0, 1, "R")
-        pdf.ln(10)
+        self.pdf.set_font("Arial", "B", 12)
+        self.pdf.cell(0, 10, f"Subtotal: ${total:.2f}", 0, 1, "R")
+        self.pdf.cell(0, 10, f"IVA (19%): ${iva:.2f}", 0, 1, "R")
+        self.pdf.cell(0, 10, f"Total: ${total_con_iva:.2f}", 0, 1, "R")
+        self.pdf.ln(10)
+        return self
+    
+    def build_footer(self):
+        """Construye el pie de página"""
+        self.pdf.set_font("Arial", "I", 12)
+        self.pdf.cell(0, 10, "Gracias por la compra", ln=True, align="C")
+        self.pdf.cell(0, 10, "No se aceptan devoluciones", ln=True, align="C")
+        self.pdf.cell(0, 10, "Contacto: restaurante@gmail.com", ln=True, align="C")
+        self.pdf.ln()
+        return self
+    
+    def save_pdf(self, filename="boleta.pdf"):
+        """Guarda el PDF en la ruta especificada"""
+        self.pdf.output(filename)
+        return filename
+    
+    def get_pdf(self):
+        """Retorna el objeto PDF construido"""
+        return self.pdf
 
-        pdf.set_font("Arial", "I", 12)
-        pdf.cell(0, 10, "Gracias por la compra", ln=True, align="C")
-        pdf.cell(0, 10, "No se aceptan devoluciones", ln=True, align="C")
-        pdf.cell(0, 10, "Contacto: restaurante@gmail.com", ln=True, align="C")
-        pdf.ln()
 
-        # Guardar el archivo PDF
-        rutapdf = "boleta.pdf" 
-        pdf.output(rutapdf)
+class BoletaDirector:
+    """Director que controla el proceso de construcción de la boleta"""
+    
+    def __init__(self, builder):
+        self.builder = builder
+    
+    def construct_complete_boleta(self, pedido, db, filename="boleta.pdf"):
+        """Construye una boleta completa siguiendo todos los pasos"""
+        return (self.builder
+                .reset()
+                .set_pedido(pedido)
+                .set_database(db)
+                .add_page()
+                .build_header()
+                .build_restaurant_info()
+                .build_table_header()
+                .build_menu_items()
+                .build_totals()
+                .build_footer()
+                .save_pdf(filename))
+    
+    def construct_simple_boleta(self, pedido, db, filename="boleta_simple.pdf"):
+        """Construye una boleta simple sin información del restaurante"""
+        return (self.builder
+                .reset()
+                .set_pedido(pedido)
+                .set_database(db)
+                .add_page()
+                .build_header()
+                .build_table_header()
+                .build_menu_items()
+                .build_totals()
+                .save_pdf(filename))
 
-        messagebox.showinfo("Boleta Generada", f"Boleta generada con éxito en la siguiente ruta: '{rutapdf}'.")
+
+class Generarboleta:
+    def __init__(self, pedido, db):
+        self.pedido = pedido
+        self.db = db
+        # Inicializar el builder y director
+        self.builder = BoletaBuilder()
+        self.director = BoletaDirector(self.builder)
+
+    def generar_boleta(self):
+        if not self.pedido.menus:
+            messagebox.showwarning("Pedido Vacío", "No hay menús en el pedido para generar la boleta.")
+            return
+
+        try:
+            # Usar el patrón Builder para generar la boleta
+            filename = self.director.construct_complete_boleta(
+                self.pedido, 
+                self.db, 
+                "boleta.pdf"
+            )
+            
+            messagebox.showinfo(
+                "Boleta Generada", 
+                f"Boleta generada con éxito en la siguiente ruta: '{filename}'.",
+                icon="check"
+            )
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al generar la boleta: {str(e)}")
+    
+    def generar_boleta_simple(self):
+        """Método adicional para generar una boleta simple"""
+        if not self.pedido.menus:
+            messagebox.showwarning("Pedido Vacío", "No hay menús en el pedido para generar la boleta.")
+            return
+
+        try:
+            filename = self.director.construct_simple_boleta(
+                self.pedido, 
+                self.db, 
+                "boleta_simple.pdf"
+            )
+            
+            messagebox.showinfo(
+                "Boleta Simple Generada", 
+                f"Boleta simple generada con éxito en la siguiente ruta: '{filename}'.",
+                icon="check"
+            )
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al generar la boleta simple: {str(e)}")
 
 if __name__ == "__main__":
     app = MainApp()
     app.mainloop()
-
