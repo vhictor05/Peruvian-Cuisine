@@ -11,7 +11,105 @@ from report_database import get_report_db, init_report_db
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-# ---------- Dominio ----------
+# ---------- Dominio (Template Method y Builder) ----------
+class OperacionReporte(ABC):
+    """Clase abstracta que define el template method para operaciones con reportes"""
+    
+    def ejecutar(self) -> tuple[bool, str]:
+        """Template method que define el flujo común"""
+        try:
+            self.validar()
+            resultado = self.operacion_principal()
+            return self.procesar_resultado(resultado)
+        except ValueError as e:
+            return False, str(e)
+        except Exception as e:
+            return False, f"Error inesperado: {str(e)}"
+    
+    @abstractmethod
+    def validar(self):
+        """Validación específica de la operación"""
+        pass
+        
+    @abstractmethod
+    def operacion_principal(self):
+        """Operación principal a realizar"""
+        pass
+        
+    @abstractmethod
+    def procesar_resultado(self, resultado):
+        """Procesamiento del resultado"""
+        pass
+
+class CrearReporteOperacion(OperacionReporte):
+    def __init__(self, service, datos: dict):
+        self.service = service
+        self.datos = datos
+    
+    def validar(self):
+        if not self.datos['titulo']:
+            raise ValueError("El título es obligatorio")
+        if not self.datos['descripcion']:
+            raise ValueError("La descripción es obligatoria")
+        if not self.datos['usuario']:
+            raise ValueError("El usuario es obligatorio")
+    
+    def operacion_principal(self):
+        reporte = (Reporte.builder()
+                  .con_titulo(self.datos['titulo'])
+                  .en_modulo(self.datos.get('modulo'))
+                  .con_urgencia(self.datos.get('urgencia'))
+                  .con_descripcion(self.datos['descripcion'])
+                  .reportado_por(self.datos['usuario'])
+                  .build())
+        return self.service.repository.crear(reporte)
+    
+    def procesar_resultado(self, resultado):
+        return True, f"Reporte {resultado} creado exitosamente"
+
+class ActualizarEstadoOperacion(OperacionReporte):
+    def __init__(self, service, ids: list[int], nuevo_estado: str):
+        self.service = service
+        self.ids = ids
+        self.nuevo_estado = nuevo_estado
+    
+    def validar(self):
+        if not self.ids:
+            raise ValueError("No hay reportes seleccionados")
+    
+    def operacion_principal(self):
+        success_count = 0
+        for id_reporte in self.ids:
+            if self.service.repository.actualizar_estado(id_reporte, self.nuevo_estado):
+                success_count += 1
+        return success_count
+    
+    def procesar_resultado(self, resultado):
+        if resultado == 0:
+            return False, "No se actualizó ningún reporte"
+        return True, f"Se actualizaron {resultado} reportes a '{self.nuevo_estado}'"
+
+class EliminarReporteOperacion(OperacionReporte):
+    def __init__(self, service, ids: list[int]):
+        self.service = service
+        self.ids = ids
+    
+    def validar(self):
+        if not self.ids:
+            raise ValueError("No hay reportes seleccionados")
+    
+    def operacion_principal(self):
+        success_count = 0
+        for id_reporte in self.ids:
+            if self.service.repository.eliminar(id_reporte):
+                success_count += 1
+        return success_count
+    
+    def procesar_resultado(self, resultado):
+        if resultado == 0:
+            return False, "No se eliminó ningún reporte"
+        return True, f"Se eliminaron {resultado} reporte(s) correctamente"
+
 class Reporte:
     def __init__(self, titulo, modulo, urgencia, descripcion, reportado_por, estado="Abierto"):
         self.titulo = titulo
@@ -28,11 +126,11 @@ class Reporte:
 class ReporteBuilder:
     def __init__(self):
         self.titulo = None
-        self.modulo = "General"  # Valor por defecto
-        self.urgencia = "Media"  # Valor por defecto
+        self.modulo = "General"
+        self.urgencia = "Media"
         self.descripcion = None
-        self.usuario_reporte = None  # Cambiado de reportado_por a usuario_reporte
-        self.estado = "Abierto"  # Valor por defecto
+        self.usuario_reporte = None
+        self.estado = "Abierto"
     
     def con_titulo(self, titulo):
         self.titulo = titulo
@@ -51,7 +149,7 @@ class ReporteBuilder:
         return self
     
     def reportado_por(self, usuario):
-        self.usuario_reporte = usuario  # Usando el nuevo nombre del atributo
+        self.usuario_reporte = usuario
         return self
     
     def con_estado(self, estado):
@@ -75,6 +173,7 @@ class ReporteBuilder:
             estado=self.estado
         )
 
+
 # ---------- Infraestructura ----------
 class IReporteRepository(ABC):
     @abstractmethod
@@ -87,6 +186,10 @@ class IReporteRepository(ABC):
         
     @abstractmethod
     def obtener_por_filtros(self, filtros: dict) -> list:
+        pass
+        
+    @abstractmethod
+    def eliminar(self, id_reporte: int) -> bool:
         pass
 
 class SQLAlchemyReporteRepository(IReporteRepository):
@@ -130,6 +233,14 @@ class SQLAlchemyReporteRepository(IReporteRepository):
             query = query.filter(ReporteError.reportado_por == filtros['usuario'])
             
         return query.order_by(ReporteError.fecha_reporte.desc()).all()
+        
+    def eliminar(self, id_reporte: int) -> bool:
+        reporte = self.db.query(ReporteError).get(id_reporte)
+        if reporte:
+            self.db.delete(reporte)
+            self.db.commit()
+            return True
+        return False
 
 # ---------- Aplicación ----------
 class ReporteService:
@@ -137,38 +248,16 @@ class ReporteService:
         self.repository = repository
         
     def crear_reporte(self, datos: dict) -> tuple[bool, str]:
-        try:
-            reporte = (Reporte.builder()
-                      .con_titulo(datos['titulo'])
-                      .en_modulo(datos.get('modulo'))
-                      .con_urgencia(datos.get('urgencia'))
-                      .con_descripcion(datos['descripcion'])
-                      .reportado_por(datos['usuario'])
-                      .build())
-            
-            id_reporte = self.repository.crear(reporte)
-            return True, f"Reporte {id_reporte} creado exitosamente"
-        except ValueError as e:
-            return False, str(e)
-        except Exception as e:
-            return False, f"Error al crear reporte: {str(e)}"
+        operacion = CrearReporteOperacion(self, datos)
+        return operacion.ejecutar()
             
     def actualizar_estados(self, ids: list[int], nuevo_estado: str) -> tuple[bool, str]:
-        if not ids:
-            return False, "No hay reportes seleccionados"
+        operacion = ActualizarEstadoOperacion(self, ids, nuevo_estado)
+        return operacion.ejecutar()
             
-        try:
-            success_count = 0
-            for id_reporte in ids:
-                if self.repository.actualizar_estado(id_reporte, nuevo_estado):
-                    success_count += 1
-            
-            if success_count == 0:
-                return False, "No se actualizó ningún reporte"
-                
-            return True, f"Se actualizaron {success_count} reportes a '{nuevo_estado}'"
-        except Exception as e:
-            return False, f"Error al actualizar estados: {str(e)}"
+    def eliminar_reporte(self, ids: list[int]) -> tuple[bool, str]:
+        operacion = EliminarReporteOperacion(self, ids)
+        return operacion.ejecutar()
             
     def obtener_reportes(self, filtros: dict) -> list:
         return self.repository.obtener_por_filtros(filtros)
@@ -183,23 +272,21 @@ class ReporteFacade:
         self.usuarios_disponibles = ["Admin", "Manager", "Recepcionista", "Cocina", "Limpieza", "Seguridad", "Otro"]
     
     def obtener_usuarios(self) -> list:
-        """Obtiene la lista de usuarios disponibles"""
         return self.usuarios_disponibles
     
     def crear_reporte(self, datos: dict) -> tuple[bool, str]:
-        """Crea un nuevo reporte usando el patrón Builder"""
         return self.service.crear_reporte(datos)
     
     def actualizar_estados(self, ids: list[int], nuevo_estado: str) -> tuple[bool, str]:
-        """Actualiza el estado de múltiples reportes"""
         return self.service.actualizar_estados(ids, nuevo_estado)
     
+    def eliminar_reporte(self, ids: list[int]) -> tuple[bool, str]:
+        return self.service.eliminar_reporte(ids)
+    
     def obtener_reportes_filtrados(self, filtros: dict) -> list:
-        """Obtiene reportes filtrados según los criterios"""
         return self.service.obtener_reportes(filtros)
     
     def get_opciones_filtro(self) -> dict:
-        """Obtiene las opciones disponibles para los filtros"""
         return {
             'modulo': ["Todos", "Restaurante", "Discoteca", "Hotel", "General"],
             'urgencia': ["Todos", "Baja", "Media", "Alta", "Crítica"],
@@ -215,13 +302,11 @@ class ReportesApp(ctk.CTk):
         self.geometry("1100x750")
         self.configure(fg_color="#1e1e2d")
         
-        # Configuración de la fachada
         self.facade = ReporteFacade()
         self.reportes_seleccionados = {}
         
-        # Inicializar interfaz
         self.create_widgets()
-    
+
     def create_widgets(self):
         # Frame principal
         main_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -362,6 +447,17 @@ class ReportesApp(ctk.CTk):
         )
         self.actualizar_btn.pack(side="right", padx=10)
         
+        # Nuevo botón para eliminar
+        self.eliminar_btn = ctk.CTkButton(
+            filter_frame,
+            text="Eliminar",
+            command=self.eliminar_reportes,
+            fg_color="#ff4757",
+            hover_color="#ff6b81",
+            width=100
+        )
+        self.eliminar_btn.pack(side="right", padx=10)
+        
         # Contenedor para la tabla
         self.tabla_container = ctk.CTkScrollableFrame(tab)
         self.tabla_container.pack(fill="both", expand=True, padx=20, pady=20)
@@ -384,7 +480,7 @@ class ReportesApp(ctk.CTk):
         encabezados_frame.pack(fill="x", pady=(0, 5))
         
         columnas = ["ID", "Título", "Módulo", "Urgencia", "Estado", "Fecha", "Reportado por", "Acciones"]
-        anchos = [50, 200, 100, 80, 100, 120, 150, 100]
+        anchos = [50, 200, 100, 80, 100, 120, 150, 150]  # Aumenté el ancho de Acciones de 100 a 150
         
         for i, (columna, ancho) in enumerate(zip(columnas, anchos)):
             ctk.CTkLabel(
@@ -416,9 +512,13 @@ class ReportesApp(ctk.CTk):
                     width=50 if j == 0 else 200 if j == 1 else 100 if j == 2 else 80 if j == 3 else 100 if j == 4 else 120 if j == 5 else 150
                 ).grid(row=0, column=j, padx=2, sticky="w")
             
-            # Botón de selección para cambiar estado
-            seleccionado = ctk.CTkCheckBox(frame_fila, text="", width=30)
-            seleccionado.grid(row=0, column=7, padx=5, sticky="e")
+            # Frame para los botones de acción
+            acciones_frame = ctk.CTkFrame(frame_fila, fg_color="transparent")
+            acciones_frame.grid(row=0, column=7, padx=5, sticky="e")
+            
+            # Checkbox de selección
+            seleccionado = ctk.CTkCheckBox(acciones_frame, text="", width=30)
+            seleccionado.pack(side="left", padx=5)
             self.reportes_seleccionados[reporte[0]] = seleccionado
     
     def enviar_reporte(self):
@@ -520,6 +620,26 @@ class ReportesApp(ctk.CTk):
                 messagebox.showerror("Error", msg)
         
         ctk.CTkButton(dialog, text="Aplicar", command=aplicar_cambios).pack(pady=10)
+        
+    def eliminar_reportes(self):
+        ids_seleccionados = [int(id_reporte) for id_reporte, checkbox in self.reportes_seleccionados.items() if checkbox.get()]
+        
+        if not ids_seleccionados:
+            messagebox.showwarning("Advertencia", "No hay reportes seleccionados para eliminar")
+            return
+            
+        confirmacion = messagebox.askyesno(
+            "Confirmar eliminación",
+            f"¿Está seguro que desea eliminar {len(ids_seleccionados)} reporte(s)? Esta acción no se puede deshacer."
+        )
+        
+        if confirmacion:
+            success, msg = self.facade.eliminar_reporte(ids_seleccionados)
+            if success:
+                messagebox.showinfo("Éxito", msg)
+                self.cargar_reportes()
+            else:
+                messagebox.showerror("Error", msg)
 
 if __name__ == "__main__":
     app = ReportesApp()
