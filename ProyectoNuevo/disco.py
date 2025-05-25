@@ -823,28 +823,31 @@ class DiscotecaApp(ctk.CTk):
         try:
             trago_str = self.trago_seleccionado.get()
             nuevo_stock = int(self.trago_stock.get())
-            
+
             if not trago_str:
                 messagebox.showwarning("Advertencia", "Seleccione un trago primero")
                 return
-                
+
             trago_nombre = trago_str.split(" ($")[0]
             trago = self.facade.obtener_trago_por_nombre(trago_nombre)
-            
-            if trago:
-                if self.facade.actualizar_stock_trago(trago.id, nuevo_stock):
 
-                    if nuevo_stock <= 0:
-                        messagebox.showinfo("Éxito", "Stock actualizado y trago marcado como no disponible")
-                    else:
-                        messagebox.showinfo("Éxito", "Stock actualizado correctamente")
+            if trago:
+                # Usar el método CRUD que devuelve el trago actualizado
+                trago_actualizado = self.facade.actualizar_stock_trago(trago.id, nuevo_stock)
+                if trago_actualizado:
+                    estado = "disponible" if trago_actualizado.disponible else "no disponible"
+                    messagebox.showinfo("Éxito", f"Stock actualizado a {nuevo_stock}, trago ahora {estado}")
+                    # Actualizar las vistas (tablas y combos)
                     self.actualizar_lista_tragos()
-                    # Actualizar el checkbox de disponibilidad
-                    self.trago_disponible.select() if trago.disponible else self.trago_disponible.deselect()
+                    self.actualizar_lista_tragos_combobox()
+                    self.actualizar_lista_tragos_combo()
                 else:
                     messagebox.showerror("Error", "No se pudo actualizar el stock")
+            else:
+                messagebox.showerror("Error", "Trago no encontrado")
         except ValueError:
             messagebox.showerror("Error", "Ingrese un valor numérico válido para el stock")
+
 
     def setup_tragos_pedidos_tab(self, tab):
         # Frame de instrucciones
@@ -1277,7 +1280,7 @@ class DiscotecaApp(ctk.CTk):
         self.trago_cantidad.delete(0, "end")
         self.trago_cantidad.insert(0, "1")
         self.cliente_seleccionado_label.configure(
-            text="Ningún cliente seleccionado",
+            text="Seleccione un cliente.",
             font=("Arial", 12)
         )
 

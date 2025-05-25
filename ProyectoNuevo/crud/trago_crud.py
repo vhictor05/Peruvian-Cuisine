@@ -35,6 +35,10 @@ class TragoCRUD:
         return db.query(Trago).filter(Trago.id == trago_id).first()
 
     @staticmethod
+    def obtener_por_nombre(db: Session, nombre: str) -> Optional[Trago]:
+        return db.query(Trago).filter(Trago.nombre == nombre).first()
+
+    @staticmethod
     def actualizar_precio(db: Session, trago_id: int, nuevo_precio: float) -> Optional[Trago]:
         trago = db.query(Trago).filter(Trago.id == trago_id).first()
         if trago:
@@ -47,7 +51,6 @@ class TragoCRUD:
     def cambiar_disponibilidad(db: Session, trago_id: int, disponible: bool) -> bool:
         trago = db.query(Trago).filter(Trago.id == trago_id).first()
         if trago:
-            # No permitir marcar como disponible si el stock es 0
             if disponible and trago.stock <= 0:
                 return False
             trago.disponible = disponible
@@ -56,13 +59,14 @@ class TragoCRUD:
         return False
 
     @staticmethod
-    def actualizar_stock(db: Session, trago_id: int, nuevo_stock: int) -> bool:
+    def actualizar_stock(db: Session, trago_id: int, nuevo_stock: int) -> Optional[Trago]:
         trago = db.query(Trago).filter(Trago.id == trago_id).first()
         if trago:
             trago.stock = nuevo_stock
-            # Si el stock llega a 0, marcar como no disponible
-            if nuevo_stock <= 0:
-                trago.disponible = False
+            # Si el stock es 0, marcar automáticamente como no disponible
+            trago.disponible = nuevo_stock > 0
             db.commit()
-            return True
-        return False
+            db.refresh(trago)  # Refrescar para obtener los datos actualizados
+            return trago
+        return None
+
