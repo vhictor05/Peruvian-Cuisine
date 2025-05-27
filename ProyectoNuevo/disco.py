@@ -11,6 +11,7 @@ import tkinter as tk
 from fpdf import FPDF
 from crud.trago_crud import TragoCRUD
 from facade.discofacade import DiscotecaFacade
+from builder.pedido_builder import PedidoBuilder
 
 
 # Crear tablas si no existen
@@ -1112,51 +1113,49 @@ class DiscotecaApp(ctk.CTk):
     def confirmar_pedido_tragos(self):
         cliente_str = self.lista_clientes.get()
         items = self.pedido_tree.get_children()
-        
+
         if not cliente_str:
             messagebox.showwarning("Advertencia", "Seleccione un cliente primero")
             return
-        
+
         if not items:
             messagebox.showwarning("Advertencia", "Agregue al menos un trago al pedido")
             return
-        
+
         try:
-            # Obtener RUT del cliente
             cliente_rut = cliente_str.split("(")[-1].rstrip(")")
             cliente = self.facade.obtener_cliente_por_rut(cliente_rut)
-            
+
             if not cliente:
                 messagebox.showerror("Error", "Cliente no encontrado")
                 return
-            
-            # Preparar detalles del pedido
-            detalles = {}
+
+            builder = PedidoBuilder().set_cliente(cliente.id)
+
             for item in items:
                 values = self.pedido_tree.item(item, "values")
                 trago_nombre = values[0]
                 cantidad = int(values[1])
-                
+
                 trago = self.facade.obtener_trago_por_nombre(trago_nombre)
-                detalles[trago.id] = cantidad
-            
-            # Calcular total
-            total = sum(
-                self.db.query(Trago.precio).filter(Trago.id == trago_id).scalar() * cantidad
-                for trago_id, cantidad in detalles.items()
+                builder.add_detalle(trago.id, cantidad, trago.precio)
+
+            pedido_data = builder.build()
+
+            pedido = self.facade.crear_pedido(
+                pedido_data["cliente_id"],
+                pedido_data["total"],
+                pedido_data["detalles"]
             )
-            
-            # Crear pedido
-            pedido = self.facade.crear_pedido(cliente.id, total, detalles)
-            
-            # Generar boleta
+
             self.generar_boleta_tragos(pedido.id)
-            
+
             messagebox.showinfo("Éxito", f"Pedido #{pedido.id} registrado\nBoleta generada: boleta_pedido_{pedido.id}.pdf")
             self.limpiar_pedido()
-            
+
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo completar el pedido: {str(e)}")
+
 
     def actualizar_lista_tragos_combobox(self):
         tragos = self.facade.listar_tragos()
