@@ -17,6 +17,7 @@ from datetime import datetime
 import tkinter as tk
 import matplotlib.pyplot as plt
 from graficos import  graficar_menus_mas_comprados, graficar_uso_ingredientes,graficar_ventas_por_fecha
+from restaurant_observer import ObserverManager  # Importar el gestor de observers
 
 # Configuración global de estilos
 ctk.set_appearance_mode("dark")
@@ -30,6 +31,10 @@ class MainApp(ctk.CTk):
         self.title("Gestión de Restaurante")
         self.geometry("1320x600")
         self.configure(fg_color="#1e1e2d")  # Fondo oscuro
+        
+        # TODO: Inicializar el gestor de observers
+        self.db_session = next(get_db())
+        self.observer_manager = ObserverManager(self.db_session)
         
         # Frame del título
         self.title_frame = ctk.CTkFrame(
@@ -96,7 +101,13 @@ class MainApp(ctk.CTk):
         for widget in self.main_frame.winfo_children():
             widget.destroy()
         db_session = next(get_db())
-        panel = PanelFactory.create_panel(panel_name, self.main_frame, db_session)
+        
+        # TODO: Pasar el observer_manager a los paneles que lo necesiten
+        if panel_name in ["IngredientePanel", "PanelCompra"]:
+            panel = PanelFactory.create_panel(panel_name, self.main_frame, db_session, self.observer_manager)
+        else:
+            panel = PanelFactory.create_panel(panel_name, self.main_frame, db_session)
+            
         panel.grid(row=0, column=0, sticky="nsew")
         self.main_frame.grid_columnconfigure(0, weight=1)
         self.main_frame.grid_rowconfigure(0, weight=1)
@@ -105,15 +116,15 @@ class MainApp(ctk.CTk):
 
 class PanelFactory:  ## utilizacion de factory method para crear los paneles de la aplicacion de manera dinamica 
     @staticmethod
-    def create_panel(panel_name, parent, db):
+    def create_panel(panel_name, parent, db, observer_manager=None):
         if panel_name == "ClientePanel":
             return ClientePanel(parent, db)
         elif panel_name == "IngredientePanel":
-            return IngredientePanel(parent, db)
+            return IngredientePanel(parent, db, observer_manager)
         elif panel_name == "MenuPanel":
             return MenuPanel(parent, db)
         elif panel_name == "PanelCompra":
-            return PanelCompra(parent, db)
+            return PanelCompra(parent, db, observer_manager)
         elif panel_name == "PanelPedido":
             return PanelPedido(parent, db)
         elif panel_name == "GraficosPanel":
@@ -459,9 +470,10 @@ class ClientePanel(ctk.CTkFrame):
             self.nombre_entry.insert(0, values[2])
 
 class IngredientePanel(ctk.CTkFrame):
-    def __init__(self, parent, db):
+    def __init__(self, parent, db, observer_manager=None):
         super().__init__(parent)
         self.db = db
+        self.observer_manager = observer_manager  # Agregar observer manager
         self.configure(fg_color="#25253a", corner_radius=15)
 
         # Título
@@ -735,11 +747,20 @@ class IngredientePanel(ctk.CTkFrame):
             return
         
         try:
-            cantidad = float(cantidad)
-            ingrediente = IngredienteCRUD.update_ingrediente(self.db, ingrediente_id,nombre, cantidad, tipo, unidad)
-            if (ingrediente):
+            nueva_cantidad = float(cantidad)
+            
+            # TODO: Obtener cantidad anterior para notificar el cambio
+            ingrediente_anterior = IngredienteCRUD.get_ingrediente_by_id(self.db, ingrediente_id)
+            cantidad_anterior = ingrediente_anterior.cantidad if ingrediente_anterior else 0
+            
+            ingrediente = IngredienteCRUD.update_ingrediente(self.db, ingrediente_id, nombre, nueva_cantidad, tipo, unidad)
+            if ingrediente:
                 messagebox.showinfo("Éxito", f"Ingrediente '{nombre}' actualizado con éxito.")
                 self.edit_window.destroy()
+                
+                # TODO: Notificar cambio en inventario usando observer
+                if self.observer_manager:
+                    self.observer_manager.notify_inventory_change(nombre, cantidad_anterior, nueva_cantidad)
             else:
                 messagebox.showerror("Error", f"Error al actualizar el ingrediente '{nombre}'.")
         except ValueError:
@@ -1452,9 +1473,10 @@ class MenuPanel(ctk.CTkFrame):
         return entry
 
 class PanelCompra(ctk.CTkFrame):
-    def __init__(self, parent, db):
+    def __init__(self, parent, db, observer_manager=None):
         super().__init__(parent)
         self.db = db  
+        self.observer_manager = observer_manager  # Agregar observer manager
         self.configure(fg_color="#25253a")
 
         # Título del Panel de Compra
@@ -1578,10 +1600,10 @@ class PanelCompra(ctk.CTkFrame):
 
         entry = ctk.CTkEntry(
             frame, 
-            corner_radius=5,
             fg_color="#25253a",
             border_color="#4361ee", 
             border_width=1, 
+            corner_radius=5,
             height=30
         )
         entry.grid(row=0, column=1, padx=10)
@@ -1674,6 +1696,7 @@ class PanelCompra(ctk.CTkFrame):
             messagebox.showerror("Error", "Por favor, selecciona un cliente.")
             return
 
+        # TODO: Implementar descuento automático de ingredientes y notificación
         menus = []
         for item in self.cart:
             menu_nombre, cantidad, _ = item
@@ -1694,9 +1717,14 @@ class PanelCompra(ctk.CTkFrame):
         )
 
         if nuevo_pedido:
+            # TODO: Notificar nuevo pedido usando observer
+            if self.observer_manager:
+                self.observer_manager.notify_new_order(nuevo_pedido)
+            
             generador_boleta = Generarboleta(nuevo_pedido, self.db)
             generador_boleta.generar_boleta()
             messagebox.showinfo("Compra Realizada", "¡Gracias por tu compra!")
+            
             self.cart.clear()
             self.refresh_cart_list()
             self.db.add(nuevo_pedido)
