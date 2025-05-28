@@ -684,6 +684,7 @@ class IngredientePanel(ctk.CTkFrame):
         except ValueError:
             messagebox.showerror("Error", "Cantidad debe ser un número.")
         finally:
+            self.observer_manager.notify_inventory_change(nombre, 0, cantidad)
             self.refresh_list()
 
     def open_edit_window(self):
@@ -1476,6 +1477,7 @@ class PanelCompra(ctk.CTkFrame):
     def __init__(self, parent, db, observer_manager=None):
         super().__init__(parent)
         self.db = db  
+        self.carrito = []  # Lista para almacenar los productos del carrito
         self.observer_manager = observer_manager  # Agregar observer manager
         self.configure(fg_color="#25253a")
 
@@ -1723,6 +1725,14 @@ class PanelCompra(ctk.CTkFrame):
             
             generador_boleta = Generarboleta(nuevo_pedido, self.db)
             generador_boleta.generar_boleta()
+        for pedido_item in self.carrito:
+            for mi in pedido_item.menu.menu_ingredientes:
+                ing = mi.ingrediente
+                cantidad_usada = mi.cantidad
+                nueva_cantidad = ing.cantidad - cantidad_usada
+                self.observer_manager.notify_inventory_change(ing.nombre, ing.cantidad, nueva_cantidad)
+                ing.cantidad = nueva_cantidad
+
             messagebox.showinfo("Compra Realizada", "¡Gracias por tu compra!")
             
             self.cart.clear()
