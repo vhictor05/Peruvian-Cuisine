@@ -39,11 +39,11 @@ class HotelFacade:
         return HabitacionCRUD.eliminar_habitacion(self.db, habitacion_id)
 
     # ===== Reservas =====
-    def crear_reserva(self, huesped_id, habitacion_id, fecha_entrada, fecha_salida):
-        return ReservaCRUD.crear_reserva(self.db, huesped_id, habitacion_id, fecha_entrada, fecha_salida)
+    def crear_reserva(self, huesped_id, habitacion_id, fecha_entrada, fecha_salida, precio_final):
+        return ReservaCRUD.crear_reserva(self.db, huesped_id, habitacion_id, fecha_entrada, fecha_salida, precio_final)
 
-    def obtener_reservas_activas(self):
-        return ReservaCRUD.obtener_reservas_activas(self.db)
+    def obtener_todas_reservas(self):
+        return ReservaCRUD.obtener_todas_reservas(self.db)
 
     def eliminar_reserva(self, reserva_id):
         return ReservaCRUD.eliminar_reserva(self.db, reserva_id)
