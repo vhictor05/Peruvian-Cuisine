@@ -67,6 +67,7 @@ class Trago(Base):
     precio = Column(Float, nullable=False)
     categoria = Column(String(50))
     disponible = Column(Boolean, default=True)
+    stock = Column(Integer, default=0)
 
 class PedidoTrago(Base):
     __tablename__ = 'pedidos_tragos'
