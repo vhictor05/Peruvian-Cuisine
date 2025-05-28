@@ -6,7 +6,7 @@ from sqlalchemy import and_
 class ReservaCRUD:
     @staticmethod
     def crear_reserva(db: Session, huesped_id: int, habitacion_id: int, 
-                      fecha_entrada: datetime, fecha_salida: datetime):
+                    fecha_entrada: datetime, fecha_salida: datetime, precio_final: float):
         # Validar fechas
         if fecha_entrada >= fecha_salida:
             raise ValueError("La fecha de entrada debe ser anterior a la fecha de salida")
@@ -31,7 +31,8 @@ class ReservaCRUD:
             habitacion_id=habitacion_id,
             fecha_entrada=fecha_entrada,
             fecha_salida=fecha_salida,
-            estado="Confirmada"
+            estado="Confirmada",
+            precio_final=precio_final  # <-- Este es el único agregado
         )
         try:
             db.add(reserva)
@@ -63,15 +64,7 @@ class ReservaCRUD:
 
         return reserva_existente is None
 
-    @staticmethod
-    def obtener_reservas_activas(db: Session):
-        hoy = datetime.now()
-        return db.query(Reserva).filter(
-            Reserva.fecha_entrada <= hoy,
-            Reserva.fecha_salida >= hoy,
-            Reserva.estado == "Confirmada"
-        ).all()
-
+    
     @staticmethod
     def eliminar_reserva(db: Session, reserva_id: int):
         reserva = db.query(Reserva).filter(Reserva.id == reserva_id).first()
@@ -99,3 +92,6 @@ class ReservaCRUD:
             db.rollback()
             raise e
 
+    @staticmethod
+    def obtener_todas_reservas(db: Session):
+        return db.query(Reserva).all()

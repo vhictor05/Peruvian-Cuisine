@@ -9,28 +9,9 @@ from models_folder.models_hotel import Huesped, Habitacion, Reserva
 from datetime import datetime, timedelta
 from tkcalendar import DateEntry, Calendar
 from hotel_facade import HotelFacade
+from hotel_estrategy import PrecioStrategyFactory, CalculadoraPrecio
 
-# ===== ESTRATEGIA DE PRECIO =====
-from abc import ABC, abstractmethod
-
-class EstrategiaPrecio(ABC):
-    @abstractmethod
-    def calcular_precio(self, base: float) -> float:
-        pass
-
-class PrecioNormal(EstrategiaPrecio):
-    def calcular_precio(self, base: float) -> float:
-        return base
-
-class PrecioConDescuento(EstrategiaPrecio):
-    def calcular_precio(self, base: float) -> float:
-        return base * 0.8  # 20% de descuento
-
-class PrecioConIVA(EstrategiaPrecio):
-    def calcular_precio(self, base: float) -> float:
-        return base * 1.19  # 19% de IVA
-
-# recreate_db()  Recreate the database with the new schema
+#recreate_db()  Recreate the database with the new schema
 Base.metadata.create_all(bind=engine)
 
 ctk.set_appearance_mode("dark")
@@ -41,7 +22,7 @@ class HotelApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Hotel")
-        self.geometry("1000x650")
+        self.geometry("1100x650")
         self.db = next(get_db())
         self.hotel_facade = HotelFacade(self.db)
         self.configure(fg_color="#1e1e2d", corner_radius=15)
@@ -734,31 +715,24 @@ class HotelApp(ctk.CTk):
             print(f"Error al acceder al TreeView: {e}")
             return
 
-        # Limpiar los elementos del TreeView
         for item in self.reserva_tree.get_children():
             self.reserva_tree.delete(item)
 
-        # Obtener todas las reservas de la base de datos
-        reservas = self.db.query(Reserva).all()
+        reservas = reservas = self.hotel_facade.obtener_todas_reservas()
         if not reservas:
-            print("No se encontraron reservas en la base de datos.")
+            print("No hay reservas activas.")
 
-        # Insertar cada reserva en el TreeView
         for res in reservas:
-            try:
-                print(f"Insertando reserva: {res.id}, {res.huesped.nombre}, {res.habitacion.numero}")
-                self.reserva_tree.insert("", "end", values=(
-                    res.id,
-                    res.huesped.nombre if res.huesped else "",
-                    res.habitacion.numero if res.habitacion else "",
-                    res.habitacion.tipo if res.habitacion else "",
-                    f"${res.habitacion.precio:.2f}" if res.habitacion else "",
-                    res.fecha_entrada.strftime("%Y-%m-%d"),
-                    res.fecha_salida.strftime("%Y-%m-%d"),
-                    res.estado
-                ))
-            except Exception as e:
-                print(f"Error insertando reserva ID {res.id}: {e}")
+            self.reserva_tree.insert("", "end", values=(
+                res.id,
+                res.huesped.nombre if res.huesped else "",
+                res.habitacion.numero if res.habitacion else "",
+                res.habitacion.tipo if res.habitacion else "",
+                f"${res.precio_final:.2f}" if res.precio_final else "",
+                res.fecha_entrada.strftime("%Y-%m-%d"),
+                res.fecha_salida.strftime("%Y-%m-%d"),
+                res.estado
+            ))
 
 
     # Método para crear reserva
@@ -788,19 +762,20 @@ class HotelApp(ctk.CTk):
                 raise ValueError("No hay habitaciones disponibles en este momento")
 
             tipo = self.tipo_precio.get()
-            if tipo == "Normal":
-                estrategia = PrecioNormal()
-            elif tipo == "Con Descuento":
-                estrategia = PrecioConDescuento()
-            elif tipo == "Con IVA":
-                estrategia = PrecioConIVA()
-            else:
-                raise ValueError("Tipo de precio no válido")
+            estrategia = PrecioStrategyFactory.obtener_estrategia(tipo)
+            calculadora = CalculadoraPrecio(estrategia)
 
-            precio_final = estrategia.calcular_precio(habitaciones_disponibles.precio)
+            precio_final = calculadora.calcular(habitaciones_disponibles.precio)
             messagebox.showinfo("Precio final", f"Precio final de la habitación: ${precio_final:.2f}")
 
-            self.hotel_facade.crear_reserva(huesped.id, habitaciones_disponibles.id, fecha_entrada, fecha_salida)
+
+            self.hotel_facade.crear_reserva(
+                huesped.id,
+                habitaciones_disponibles.id,
+                fecha_entrada,
+                fecha_salida,
+                precio_final
+            )
 
             habitaciones_disponibles.disponible = False
             self.db.commit()
@@ -810,7 +785,7 @@ class HotelApp(ctk.CTk):
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo crear la reserva: {str(e)}")
-    
+        
     def modificar_reserva(self):
         selected_item = self.reserva_tree.selection()
         if not selected_item:
@@ -941,17 +916,19 @@ class HotelApp(ctk.CTk):
         if not rut:
             messagebox.showwarning("Advertencia", "Ingrese un RUT para buscar")
             return
-            
-        huesped = self.hotel_facade.obtener_huesped_por_rut(self.db, rut)
+
+        huesped = self.hotel_facade.obtener_huesped_por_rut(rut)
         if huesped:
             self.huesped_nombre.delete(0, "end")
             self.huesped_nombre.insert(0, huesped.nombre)
+
             self.huesped_email.delete(0, "end")
             if huesped.email:
                 self.huesped_email.insert(0, huesped.email)
+
             self.huesped_telefono.delete(0, "end")
             if huesped.telefono:
-                self.huesped_telefono.insert(0, "end", huesped.telefono)
+                self.huesped_telefono.insert(0, huesped.telefono)
         else:
             messagebox.showinfo("Información", "No se encontró el huésped")
 

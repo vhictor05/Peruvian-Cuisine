@@ -32,6 +32,7 @@ class Reserva(Base):
     fecha_entrada = Column(DateTime, nullable=False)
     fecha_salida = Column(DateTime, nullable=False)
     estado = Column(String, default="Confirmada")
+    precio_final = Column(Float, nullable=True)
     
     huesped = relationship("Huesped", back_populates="reservas")
     habitacion = relationship("Habitacion", back_populates="reservas")
