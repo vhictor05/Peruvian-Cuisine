@@ -218,4 +218,60 @@ Mesa "*" --* "*" DetalleReservaMesa
 
 
 
+
+
+' ==== Reportes completo y conectado ====
+class ReporteFacade {
+  +crear_reporte(datos): (bool, str)
+  +actualizar_estados(ids, estado): (bool, str)
+  +eliminar_reporte(ids): (bool, str)
+  +obtener_reportes_filtrados(filtros): list
+  +get_opciones_filtro(): dict
+  +mostrar_menu(): void
+}
+ReporteFacade ..|> IServicio
+ReporteFacade *-- ReporteService
+
+class ReporteService {
+  +crear_reporte(datos): (bool, str)
+  +actualizar_estados(ids, estado): (bool, str)
+  +eliminar_reporte(ids): (bool, str)
+  +obtener_reportes(filtros): list
+}
+ReporteService *-- IReporteRepository
+ReporteService --> Reporte 
+
+interface IReporteRepository {
+  +crear(reporte): int
+  +actualizar_estado(id, estado): bool
+  +obtener_por_filtros(filtros): list
+  +eliminar(id): bool
+}
+IReporteRepository --> Reporte
+
+
+
+class Reporte {
+  +id: int
+  +titulo: str
+  +modulo: str
+  +urgencia: str
+  +descripcion: str
+  +estado: str
+  +reportado_por: str
+  +fecha_reporte: datetime
+  +builder(): ReporteBuilder
+}
+
+class ReporteBuilder {
+  +con_titulo(titulo): ReporteBuilder
+  +en_modulo(modulo): ReporteBuilder
+  +con_urgencia(urgencia): ReporteBuilder
+  +con_descripcion(desc): ReporteBuilder
+  +reportado_por(usuario): ReporteBuilder
+  +con_estado(estado): ReporteBuilder
+  +build(): Reporte
+}
+ReporteBuilder --> Reporte 
+
 @enduml
