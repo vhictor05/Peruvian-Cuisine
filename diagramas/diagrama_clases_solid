@@ -19,7 +19,7 @@ class SistemaPrincipal {
   +elegir_servicio(tipo: str): IServicio
   +mostrar_opciones(): void
 }
-SistemaPrincipal --> IServicio : usa()
+SistemaPrincipal --> IServicio 
 
 
 
@@ -81,7 +81,7 @@ class Disco {
 Disco ..|> IServicio
 
 Disco *-- "0..1" Evento
-Disco *-- "0..*" ClienteDisco
+
 Disco *-- "0..*" Entrada
 Disco *-- "0..*" Trago
 Disco *-- "0..*" PedidoBar
@@ -171,8 +171,6 @@ class Hotel {
   +comprar(): void
 }
 Hotel ..|> IServicio
-
-Hotel *-- "0..*" Huesped
 Hotel *-- "1..*" Habitacion
 Hotel *-- "0..*" Reserva
 Reserva "*" --> "1" Huesped
@@ -239,7 +237,6 @@ class Restaurante {
 }
 Restaurante ..|> IServicio
 
-Restaurante *-- "0..*" Cliente
 Restaurante *-- "0..*" Pedido
 Restaurante *-- "1..*" Menu
 Restaurante *-- "0..*" ReservaRestaurante
@@ -309,5 +306,28 @@ class ReporteBuilder {
   +build(): Reporte
 }
 ReporteBuilder --> Reporte 
+
+class ReporteService {
+  +crear_reporte(datos): (bool, str)
+  +actualizar_estados(ids, estado): (bool, str)
+  +eliminar_reporte(ids): (bool, str)
+}
+
+abstract class OperacionReporte {
+  +ejecutar(): (bool, str)
+  #validar()
+  #operacion_principal()
+  #procesar_resultado()
+}
+
+class CrearReporteOperacion
+class ActualizarEstadoOperacion
+class EliminarReporteOperacion
+
+ReporteService ..> OperacionReporte : usa >>
+OperacionReporte <|-- CrearReporteOperacion
+OperacionReporte <|-- ActualizarEstadoOperacion
+OperacionReporte <|-- EliminarReporteOperacion
+
 
 @enduml
