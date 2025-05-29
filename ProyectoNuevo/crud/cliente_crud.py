@@ -1,7 +1,7 @@
 import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from models import Cliente
+from models_folder.models_restaurente import Cliente
 class ClienteCRUD:
 
     @staticmethod

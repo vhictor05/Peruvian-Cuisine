@@ -2,38 +2,124 @@ import customtkinter as ctk
 from tkinter import messagebox, ttk
 from datetime import datetime
 from sqlalchemy.orm import Session
-from hotel_database import get_db, Base, recreate_db
-from models import Huesped, Habitacion, Reserva
+from hotel_database import get_db, Base, recreate_db, engine
+from models_folder.models_hotel import Huesped, Habitacion, Reserva
 from crud.huesped_crud import HuespedCRUD
 from crud.habitacion_crud import HabitacionCRUD
 from crud.reserva_crud import ReservaCRUD
 from datetime import datetime, timedelta
 from tkcalendar import DateEntry
+from builder.hotel_builder import HotelBuilder
 
-# recreate_db()  # Recreate the database with the new schema
+# ===== ESTRATEGIA DE PRECIO =====
+from abc import ABC, abstractmethod
+
+class EstrategiaPrecio(ABC):
+    @abstractmethod
+    def calcular_precio(self, base: float) -> float:
+        pass
+
+class PrecioNormal(EstrategiaPrecio):
+    def calcular_precio(self, base: float) -> float:
+        return base
+
+class PrecioConDescuento(EstrategiaPrecio):
+    def calcular_precio(self, base: float) -> float:
+        return base * 0.8  # 20% de descuento
+
+class PrecioConIVA(EstrategiaPrecio):
+    def calcular_precio(self, base: float) -> float:
+        return base * 1.19  # 19% de IVA
+
+recreate_db()  # Recreate the database with the new schema
+Base.metadata.create_all(bind=engine)
+
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+
 
 class HotelApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Hotel")
-        self.geometry("1200x700")
+        self.geometry("900x650")
         self.db = next(get_db())
-        self.configure(fg_color="#25253e", corner_radius=15)
+        self.configure(fg_color="#1e1e2d", corner_radius=15)
         
-        # Menú lateral
-        self.menu_frame = ctk.CTkFrame(self, height=100, corner_radius=0, fg_color="#1e1e2d")
-        self.menu_frame.pack(side="top", fill="x")
+        # Configurar el estilo del Treeview al inicio
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Treeview", 
+            background="#1e1e2d",          # Color de fondo para las filas
+            foreground="white",            # Color del texto
+            fieldbackground="#1e1e2d",     # Color de fondo para el área de datos
+            bordercolor="#3b3b3b",
+            borderwidth=0
+        )
+        # Color para la cabecera (nombres de columnas)
+        style.configure("Treeview.Heading",
+            background="#1e1e2d",         # Color de fondo de la cabecera
+            foreground="white",           # Color del texto de la cabecera
+            borderwidth=1
+        )
+        # Color cuando se selecciona una fila
+        style.map('Treeview', 
+            background=[('selected', '#f72585')],     # Color rosa cuando se selecciona
+            foreground=[('selected', 'white')]        # Color del texto cuando se selecciona
+        )
+
+        # Configurar el grid del contenedor principal
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(1, weight=1)
         
-        # Contenido principal
-        self.main_frame = ctk.CTkFrame(self, corner_radius=15, fg_color="#1e1e2d")
-        self.main_frame.pack(side="bottom", fill="both", expand=True, padx=30, pady=30)
+        # Frame del título
+        self.title_frame = ctk.CTkFrame(
+            self, 
+            fg_color="#1e1e2d",
+            height=60,  # Altura fija
+            corner_radius=0
+        )
+        self.title_frame.grid(row=0, column=0, padx=30, pady=65, sticky="ew")
+        self.title_frame.grid_propagate(False)  # Mantener altura fija
         
-        # Botones del menú
-        self.create_menu_button("Huéspedes", self.show_huespedes)
-        self.create_menu_button("Habitaciones", self.show_habitaciones)
-        self.create_menu_button("Reservas", self.show_reservas)
+        # Label del título principal
+        ctk.CTkLabel(
+            self.title_frame,
+            text="HOTEL",
+            font=("Arial", 26, "bold"),
+            text_color="#f72585"
+        ).place(relx=0.2, rely=0.3, anchor="w")  # Cambiado a anchor="w" y relx=0.2
+
+        # Label subtítulo
+        ctk.CTkLabel(
+            self.title_frame,
+            text="MANAGER",
+            font=("Arial", 23),
+            text_color="#fa5c9c"
+        ).place(relx=0.2, rely=0.7, anchor="w")  # Cambiado a anchor="w" y mismo relx
+        
+        # Menú lateral (ahora usando grid)
+        self.menu_frame = ctk.CTkFrame(
+            self, 
+            width=200,
+            fg_color="#25253a",
+            corner_radius=15
+        )
+        self.menu_frame.grid(row=1, column=0, sticky="nsw", padx=30, pady=(0, 30))
+        self.menu_frame.grid_propagate(False)  # Mantener el ancho fijo
+        
+        # Contenido principal (ahora usando grid)
+        self.main_frame = ctk.CTkFrame(
+            self, 
+            corner_radius=15, 
+            fg_color="#25253a"
+        )
+        self.main_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(10,30), pady=30)
+
+        # Botones del menú (ahora apilados verticalmente)
+        self.create_menu_button("    Huéspedes", self.show_huespedes)
+        self.create_menu_button("    Habitaciones", self.show_habitaciones)
+        self.create_menu_button("    Reservas", self.show_reservas)
         
         # Mostrar panel de huéspedes por defecto
         self.show_huespedes()
@@ -43,14 +129,16 @@ class HotelApp(ctk.CTk):
             self.menu_frame,
             text=text,
             command=command,
-            font=("Arial", 14, "bold"),
-            height=40,
-            width=150,
-            corner_radius=50,
-            fg_color="#f72585",  # Color principal
-            hover_color="#fa5c9c"
+            font=("Arial", 20),
+            height=50,
+            width=240,
+            corner_radius=0,
+            fg_color="#25253a",  # Color principal
+            hover_color="#fa5c9c",
+            anchor="w",  # Alinear texto a la izquierda
+            text_color="white",  # Color del texto
         )
-        btn.pack(side="left", padx=10, pady=20)
+        btn.pack(side="top", fill="x", pady=15)
 
     def clear_main_frame(self):
         for widget in self.main_frame.winfo_children():
@@ -66,73 +154,177 @@ class HotelApp(ctk.CTk):
             text="Gestión de Huéspedes",
             font=("Arial", 28, "bold"),
             text_color="#f72585"
-        ).grid(row=0, column=0, columnspan=2, pady=10)
+        ).pack(pady=10)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self.main_frame, fg_color="#25253e", corner_radius=15)
-        form_frame.grid(row=1, column=0, padx=20, pady=10, sticky="n")
+        form_frame = ctk.CTkFrame(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
+        form_frame.pack(fill="x", padx=30, pady=10)
 
         # Campos del formulario organizados con grid()
-        ctk.CTkLabel(form_frame, text="Nombre:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.huesped_nombre = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#f72585", border_width=2)
-        self.huesped_nombre.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        # Nombre y RUT
+        ctk.CTkLabel(
+            form_frame, 
+            text="Nombre:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=0, padx=10, pady=(10,0), sticky="w")
+        
+        self.huesped_nombre = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#f72585", 
+            border_width=1
+        )
+        self.huesped_nombre.grid(row=1, column=0, padx=10, pady=(5,10), sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="RUT:", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=10, sticky="w")
-        self.huesped_rut = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#f72585", border_width=2)
-        self.huesped_rut.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(
+            form_frame, 
+            text="RUT:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=1, padx=10, pady=(10,0), sticky="w")
+        
+        self.huesped_rut = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#f72585", 
+            border_width=1
+        )
+        self.huesped_rut.grid(row=1, column=1, padx=10, pady=(5,10), sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="Email:", font=("Arial", 14)).grid(row=2, column=0, padx=10, pady=10, sticky="w")
-        self.huesped_email = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#f72585", border_width=2)
-        self.huesped_email.grid(row=2, column=1, padx=10, pady=10, sticky="ew")
+        # Email y Teléfono
+        ctk.CTkLabel(
+            form_frame, 
+            text="Email:", 
+            font=("Arial", 14)
+        ).grid(row=2, column=0, padx=10, pady=(10,0), sticky="w")
+        
+        self.huesped_email = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#f72585", 
+            border_width=1
+        )
+        self.huesped_email.grid(row=3, column=0, padx=10, pady=(5,10), sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="Teléfono:", font=("Arial", 14)).grid(row=3, column=0, padx=10, pady=10, sticky="w")
-        self.huesped_telefono = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#f72585", border_width=2)
-        self.huesped_telefono.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(
+            form_frame, 
+            text="Teléfono:", 
+            font=("Arial", 14)
+        ).grid(row=2, column=1, padx=10, pady=(10,0), sticky="w")
+        
+        self.huesped_telefono = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#f72585", 
+            border_width=1
+        )
+        self.huesped_telefono.grid(row=3, column=1, padx=10, pady=(5,10), sticky="ew")
 
         # Configurar las columnas del formulario para que las entradas se expandan
+        form_frame.columnconfigure(0, weight=1)
         form_frame.columnconfigure(1, weight=1)
 
-        # Botones debajo del formulario
-        btn_frame = ctk.CTkFrame(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
-        btn_frame.grid(row=2, column=0, pady=5, sticky="n")
+        # Frame para botones
+        btn_frame = ctk.CTkFrame(self.main_frame, fg_color="#25253a", corner_radius=15)
+        btn_frame.pack(pady=10)
 
         ctk.CTkButton(
             btn_frame,
-            text="Registrar",
+            text="📋 Registrar",
             command=self.registrar_huesped,
             fg_color="#f72585",
             hover_color="#fa5c9c",
-            font=("Arial", 16, "bold"),
+            font=("Arial", 16),
             height=50,
-            width=150,
-            corner_radius=50
+            width=140,
+            corner_radius=15
         ).pack(side="left", padx=10)
 
         ctk.CTkButton(
             btn_frame,
-            text="Buscar",
+            text="🔍 Buscar",
             command=self.buscar_huesped,
             fg_color="#f72585",
             hover_color="#fa5c9c",
-            font=("Arial", 16, "bold"),
+            font=("Arial", 16),
             height=50,
-            width=150,
-            corner_radius=50
+            width=140,
+            corner_radius=15
         ).pack(side="left", padx=10)
 
         # Tabla de huéspedes
         columns = ["ID", "Nombre", "RUT", "Email", "Teléfono"]
-        self.huesped_tree = ttk.Treeview(self.main_frame, columns=columns, show="headings")
+        self.huesped_tree = ttk.Treeview(self.main_frame, columns=columns, show="headings", height=10)
         for col in columns:
             self.huesped_tree.heading(col, text=col)
-            self.huesped_tree.column(col, width=120)
+            if col == "ID":
+                self.huesped_tree.column(col, width=15)  # ID más estrecho
+            else:
+                self.huesped_tree.column(col, width=100)
 
-        self.huesped_tree.grid(row=1, column=1, rowspan=2, padx=20, pady=10, sticky="nsew")
+        self.huesped_tree.pack(fill="both", expand=True, padx=20, pady=10)
 
         # Configurar las columnas del main_frame para que la tabla se expanda
         self.main_frame.columnconfigure(1, weight=1)
         self.main_frame.rowconfigure(1, weight=1)
 
+        # Llamar al método para actualizar la lista de huéspedes
+        self.actualizar_lista_huespedes()
+
+    # ===== MÉTODOS AUXILIARES =====
+    def registrar_huesped(self):
+        nombre = self.huesped_nombre.get()
+        rut = self.huesped_rut.get()
+        
+        if not nombre or not rut:
+            messagebox.showerror("Error", "Nombre y RUT son obligatorios")
+            return
+            
+        try:
+            HuespedCRUD.crear_huesped(
+                self.db,
+                nombre=nombre,
+                rut=rut,
+                email=self.huesped_email.get() or None,
+                telefono=self.huesped_telefono.get() or None
+            )
+            messagebox.showinfo("Éxito", "Huésped registrado correctamente")
+            self.actualizar_lista_huespedes()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo registrar: {str(e)}")
+
+    def actualizar_lista_huespedes(self):
+        for item in self.huesped_tree.get_children():
+            self.huesped_tree.delete(item)
+            
+        huespedes = self.db.query(Huesped).all()
+        for huesped in huespedes:
+            self.huesped_tree.insert("", "end", values=(
+                huesped.id,
+                huesped.nombre,
+                huesped.rut,
+                huesped.email or "",
+                huesped.telefono or ""
+            ))
+
+    def buscar_huesped(self):
+        rut = self.huesped_rut.get()
+        if not rut:
+            messagebox.showwarning("Advertencia", "Ingrese un RUT para buscar")
+            return
+            
+        huesped = HuespedCRUD.obtener_huesped_por_rut(self.db, rut)
+        if huesped:
+            self.huesped_nombre.delete(0, "end")
+            self.huesped_nombre.insert(0, huesped.nombre)
+            self.huesped_email.delete(0, "end")
+            if huesped.email:
+                self.huesped_email.insert(0, huesped.email)
+            self.huesped_telefono.delete(0, "end")
+            if huesped.telefono:
+                self.huesped_telefono.insert(0, huesped.telefono)
+        else:
+            messagebox.showinfo("Información", "No se encontró el huésped")
+    
     # ===== PANEL HABITACIONES =====
     def show_habitaciones(self):
         self.clear_main_frame()
@@ -143,72 +335,197 @@ class HotelApp(ctk.CTk):
             text="Gestión de Habitaciones",
             font=("Arial", 28, "bold"),
             text_color="#f72585"
-        ).grid(row=0, column=0, columnspan=2, pady=10)
+        ).pack(pady=10)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self.main_frame, fg_color="#25253e", corner_radius=15)
-        form_frame.grid(row=1, column=0, padx=20, pady=10, sticky="n")
+        form_frame = ctk.CTkFrame(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
+        form_frame.pack(fill="x", padx=30, pady=10)
 
         # Campos del formulario organizados con grid()
-        ctk.CTkLabel(form_frame, text="Número:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.habitacion_numero = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#f72585", border_width=2)
-        self.habitacion_numero.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        # Número y Tipo (en la misma fila)
+        ctk.CTkLabel(
+            form_frame, 
+            text="Número:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=0, padx=10, pady=(10,0), sticky="w")
+        
+        self.habitacion_numero = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#f72585", 
+            border_width=1
+        )
+        self.habitacion_numero.grid(row=1, column=0, padx=10, pady=(5,10), sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="Tipo:", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=10, sticky="w")
+        ctk.CTkLabel(
+            form_frame, 
+            text="Tipo:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=1, padx=10, pady=(10,0), sticky="w")
+        
         self.habitacion_tipo = ctk.CTkComboBox(
             form_frame,
             values=["VIP", "Penthouse", "Grande", "Mediana", "Pequeña"],
-            fg_color="#f72585"
+            fg_color="#25253a",
+            border_color="#f72585",
+            border_width=1
         )
-        self.habitacion_tipo.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+        self.habitacion_tipo.grid(row=1, column=1, padx=10, pady=(5,10), sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="Precio:", font=("Arial", 14)).grid(row=2, column=0, padx=10, pady=10, sticky="w")
-        self.habitacion_precio = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#f72585", border_width=2)
-        self.habitacion_precio.grid(row=2, column=1, padx=10, pady=10, sticky="ew")
+        # Precio (debajo de Número)
+        ctk.CTkLabel(
+            form_frame, 
+            text="Precio:", 
+            font=("Arial", 14)
+        ).grid(row=2, column=0, padx=10, pady=(10,0), sticky="w")
+        
+        self.habitacion_precio = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#f72585", 
+            border_width=1
+        )
+        self.habitacion_precio.grid(row=3, column=0, padx=10, pady=(5,10), sticky="ew")
 
         # Configurar las columnas del formulario para que las entradas se expandan
+        form_frame.columnconfigure(0, weight=1)
         form_frame.columnconfigure(1, weight=1)
 
-        # Botones debajo del formulario
-        btn_frame = ctk.CTkFrame(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
-        btn_frame.grid(row=2, column=0, pady=5, sticky="n")
+        # Frame para botones
+        btn_frame = ctk.CTkFrame(self.main_frame, fg_color="#25253a", corner_radius=15)
+        btn_frame.pack(pady=10)
 
         ctk.CTkButton(
             btn_frame,
-            text="Registrar",
+            text="📋 Registrar",
             command=self.registrar_habitacion,
             fg_color="#f72585",
             hover_color="#fa5c9c",
-            font=("Arial", 16, "bold"),
+            font=("Arial", 16),
             height=50,
-            width=150,
-            corner_radius=50
+            width=140,
+            corner_radius=15
         ).pack(side="left", padx=10)
 
         ctk.CTkButton(
             btn_frame,
-            text="Modificar",
+            text="📝 Modificar",
             command=self.modificar_habitacion,
             fg_color="#f72585",
             hover_color="#fa5c9c",
-            font=("Arial", 16, "bold"),
+            font=("Arial", 16),
             height=50,
-            width=150,
-            corner_radius=50
+            width=140,
+            corner_radius=15
         ).pack(side="left", padx=10)
 
         # Tabla de habitaciones
         columns = ["ID", "Número", "Tipo", "Precio", "Disponible"]
-        self.habitacion_tree = ttk.Treeview(self.main_frame, columns=columns, show="headings")
+        self.habitacion_tree = ttk.Treeview(self.main_frame, columns=columns, show="headings", height=10)
         for col in columns:
             self.habitacion_tree.heading(col, text=col)
-            self.habitacion_tree.column(col, width=120)
+            if col == "ID":
+                self.habitacion_tree.column(col, width=15)  # ID más estrecho
+            else:
+                self.habitacion_tree.column(col, width=100)
 
-        self.habitacion_tree.grid(row=1, column=1, rowspan=2, padx=20, pady=10, sticky="nsew")
+        self.habitacion_tree.pack(fill="both", expand=True, padx=20, pady=10)
 
         # Configurar las columnas del main_frame para que la tabla se expanda
         self.main_frame.columnconfigure(1, weight=1)
         self.main_frame.rowconfigure(1, weight=1)
+
+        # Llamar al método para actualizar la lista de habitaciones
+        self.actualizar_lista_habitaciones()
+
+    def registrar_habitacion(self):
+        # Obtener los valores ingresados en los campos
+        numero = self.habitacion_numero.get()
+        tipo = self.habitacion_tipo.get()
+        precio = self.habitacion_precio.get()
+
+        # Validar que todos los campos estén completos
+        if not numero or not tipo or not precio:
+            messagebox.showerror("Error", "Todos los campos son obligatorios")
+            return
+
+        try:
+            precio = float(precio)  # Convertir el precio a tipo flotante
+            HabitacionCRUD.crear_habitacion(
+                self.db, 
+                numero=numero, 
+                tipo=tipo, 
+                precio=precio
+            )
+            messagebox.showinfo("Éxito", "Habitación registrada correctamente")
+            self.actualizar_lista_habitaciones()  # Actualizar la lista de habitaciones
+        except ValueError:
+            messagebox.showerror("Error", "Precio debe ser un número válido")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo registrar la habitación: {str(e)}")
+
+    def modificar_habitacion(self):
+        # Obtener la habitación seleccionada en el TreeView
+        selected_item = self.habitacion_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione una habitación para modificar")
+            return
+
+        # Obtener los valores de la habitación seleccionada
+        habitacion_id = self.habitacion_tree.item(selected_item, "values")[0]
+
+        # Obtener los nuevos valores del formulario
+        numero = self.habitacion_numero.get()
+        tipo = self.habitacion_tipo.get()
+        precio = self.habitacion_precio.get()
+        disponible = messagebox.askyesno("Disponibilidad", "¿Está disponible esta habitación?")
+
+        if not all([numero, tipo, precio]):
+            messagebox.showerror("Error", "Todos los campos son obligatorios")
+            return
+
+        try:
+            precio = float(precio)  # Convertir el precio a tipo flotante
+            HabitacionCRUD.modificar_habitacion(
+                self.db,
+                habitacion_id=habitacion_id,
+                numero=numero,
+                tipo=tipo,
+                precio=precio,
+                disponible=disponible
+            )
+            messagebox.showinfo("Éxito", "Habitación modificada correctamente")
+            self.actualizar_lista_habitaciones()  # Actualizar la lista de habitaciones
+        except ValueError:
+            messagebox.showerror("Error", "Precio debe ser un número válido")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo modificar la habitación: {str(e)}")
+
+    def actualizar_lista_habitaciones(self):
+        # Verificar si el TreeView está disponible
+        if not hasattr(self, 'habitacion_tree') or not self.habitacion_tree.winfo_exists():
+            print("El TreeView de habitaciones no está disponible o ha sido destruido.")
+            return  # Evita errores si el TreeView no existe
+        
+        # Limpiar los elementos del TreeView
+        for item in self.habitacion_tree.get_children():
+            self.habitacion_tree.delete(item)
+        
+        # Obtener todas las habitaciones de la base de datos
+        habitaciones = self.db.query(Habitacion).all()
+        if not habitaciones:
+            print("No se encontraron habitaciones en la base de datos.")
+        
+        # Insertar cada habitación en el TreeView
+        for hab in habitaciones:
+            print(f"Insertando habitación: {hab.id}, {hab.numero}, {hab.tipo}")
+            self.habitacion_tree.insert("", "end", values=(
+                hab.id,
+                hab.numero,
+                hab.tipo,
+                f"${hab.precio:.2f}",
+                "Sí" if hab.disponible else "No"
+            ))
 
     # ===== PANEL RESERVAS =====
     def show_reservas(self):
@@ -220,80 +537,140 @@ class HotelApp(ctk.CTk):
             text="Gestión de Reservas",
             font=("Arial", 28, "bold"),
             text_color="#f72585"
-        ).grid(row=0, column=0, columnspan=2, pady=10)
+        ).pack(pady=10)
 
         # Frame del formulario
-        form_frame = ctk.CTkFrame(self.main_frame, fg_color="#25253e", corner_radius=15)
-        form_frame.grid(row=1, column=0, padx=20, pady=10, sticky="n")
+        form_frame = ctk.CTkFrame(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
+        form_frame.pack(fill="x", padx=30, pady=10)
 
         # Campos del formulario organizados con grid()
-        ctk.CTkLabel(form_frame, text="Huésped:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        # Huésped y Tipo de Habitación (en columnas separadas)
+        ctk.CTkLabel(
+            form_frame, 
+            text="Huésped:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=0, padx=10, pady=(10,0), sticky="w")
+        
         self.reserva_huesped = ctk.CTkComboBox(
             form_frame,
             values=self.obtener_huespedes_combobox(),
-            fg_color="#f72585"
+            fg_color="#25253a",
+            border_color="#f72585",
+            border_width=1
         )
-        self.reserva_huesped.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        self.reserva_huesped.grid(row=1, column=0, padx=10, pady=(5,10), sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="Tipo de Habitación:", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=10, sticky="w")
+        ctk.CTkLabel(
+            form_frame, 
+            text="Tipo de Habitación:", 
+            font=("Arial", 14)
+        ).grid(row=0, column=1, padx=10, pady=(10,0), sticky="w")
+        
         self.habitacion_tipo = ctk.CTkComboBox(
             form_frame,
             values=["VIP", "Penthouse", "Grande", "Mediana", "Pequeña"],
-            fg_color="#f72585"
+            fg_color="#25253a",
+            border_color="#f72585",
+            border_width=1
         )
-        self.habitacion_tipo.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+        self.habitacion_tipo.grid(row=1, column=1, padx=10, pady=(5,10), sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="Fecha Entrada:", font=("Arial", 14)).grid(row=2, column=0, padx=10, pady=10, sticky="w")
-        self.reserva_fecha_entrada = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#f72585", border_width=2)
-        self.reserva_fecha_entrada.grid(row=2, column=1, padx=10, pady=10, sticky="ew")
+        # Fecha Entrada y Fecha Salida
+        ctk.CTkLabel(
+            form_frame, 
+            text="Fecha Entrada:", 
+            font=("Arial", 14)
+        ).grid(row=2, column=0, padx=10, pady=(10,0), sticky="w")
+        
+        self.reserva_fecha_entrada = ctk.CTkEntry(
+            form_frame, 
+            fg_color="#25253a", 
+            border_color="#f72585", 
+            border_width=1
+        )
+        self.reserva_fecha_entrada.grid(row=3, column=0, padx=10, pady=(5,10), sticky="ew")
 
-        ctk.CTkLabel(form_frame, text="Fecha Salida:", font=("Arial", 14)).grid(row=3, column=0, padx=10, pady=10, sticky="w")
-        self.reserva_fecha_salida = ctk.CTkEntry(form_frame, fg_color="#1e1e2d", border_color="#f72585", border_width=2)
-        self.reserva_fecha_salida.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(
+            form_frame, 
+            text="Fecha Salida:", 
+            font=("Arial", 14)
+        ).grid(row=2, column=1, padx=10, pady=(10,0), sticky="w")
+        
+        self.reserva_fecha_salida = ctk.CTkEntry(
+        form_frame, 
+        fg_color="#25253a", 
+        border_color="#f72585", 
+        border_width=1
+        )
+        self.reserva_fecha_salida.grid(row=3, column=1, padx=10, pady=(5,10), sticky="ew")
 
-        # Configurar las columnas del formulario para que las entradas se expandan
+        # Selector de estrategia de precio (Strategy)
+        ctk.CTkLabel(
+        form_frame, 
+        text="Tipo de Precio:", 
+        font=("Arial", 14)
+        ).grid(row=4, column=0, padx=10, pady=(10,0), sticky="w")
+
+        self.tipo_precio = ctk.CTkComboBox(
+        form_frame,
+        values=["Normal", "Con Descuento", "Con IVA"],
+        fg_color="#25253a",
+        border_color="#f72585",
+        border_width=1
+        )
+        self.tipo_precio.set("Normal")
+        self.tipo_precio.grid(row=5, column=0, padx=10, pady=(5,10), sticky="ew")
+
+        # Configurar columnas del formulario
+        form_frame.columnconfigure(0, weight=1)
         form_frame.columnconfigure(1, weight=1)
 
-        # Botones debajo del formulario
-        btn_frame = ctk.CTkFrame(self.main_frame, fg_color="#1e1e2d", corner_radius=15)
-        btn_frame.grid(row=2, column=0, pady=5, sticky="n")
+        # Botones
+        btn_frame = ctk.CTkFrame(self.main_frame, fg_color="#25253a", corner_radius=15)
+        btn_frame.pack(pady=10)
 
         ctk.CTkButton(
-            btn_frame,
-            text="Crear Reserva",
-            command=self.crear_reserva,
-            fg_color="#f72585",
-            hover_color="#fa5c9c",
-            font=("Arial", 16, "bold"),
-            height=50,
-            width=200,
-            corner_radius=50
+        btn_frame,
+        text="📄 Crear Reserva",
+        command=self.crear_reserva,
+        fg_color="#f72585",
+        hover_color="#fa5c9c",
+        font=("Arial", 16),
+        height=50,
+        width=140,
+        corner_radius=15
         ).pack(side="left", padx=10)
 
         ctk.CTkButton(
-            btn_frame,
-            text="Eliminar Reserva",
-            command=self.eliminar_reserva,
-            fg_color="#f72585",
-            hover_color="#fa5c9c",
-            font=("Arial", 16, "bold"),
-            height=50,
-            width=200,
-            corner_radius=50
+        btn_frame,
+        text="🗑 Eliminar Reserva",
+        command=self.eliminar_reserva,
+        fg_color="#f72585",
+        hover_color="#fa5c9c",
+        font=("Arial", 16),
+        height=50,
+        width=140,
+        corner_radius=15
         ).pack(side="left", padx=10)
 
         # Tabla de reservas
         columns = ["ID", "Huésped", "Habitación", "Entrada", "Salida", "Estado"]
-        self.reserva_tree = ttk.Treeview(self.main_frame, columns=columns, show="headings")
+        self.reserva_tree = ttk.Treeview(self.main_frame, columns=columns, show="headings", height=10)
         for col in columns:
             self.reserva_tree.heading(col, text=col)
-            self.reserva_tree.column(col, width=120)
+            if col == "ID":
+                self.reserva_tree.column(col, width=15)  # ID más estrecho
+            else:
+                self.reserva_tree.column(col, width=100)
 
-        self.reserva_tree.grid(row=1, column=1, rowspan=2, padx=20, pady=10, sticky="nsew")
+        self.reserva_tree.pack(fill="both", expand=True, padx=20, pady=10)
 
         # Configurar las columnas del main_frame para que la tabla se expanda
         self.main_frame.columnconfigure(1, weight=1)
         self.main_frame.rowconfigure(1, weight=1)
+
+        # Llamar al método para actualizar la lista de reservas
+        self.actualizar_lista_reservas()
     
     # Función que obtiene los huéspedes para el combobox, asegurándonos de que devuelvan tanto el nombre como el rut
     def obtener_huespedes_combobox(self):
@@ -305,10 +682,13 @@ class HotelApp(ctk.CTk):
         return [f"{h.numero} - {h.tipo}" for h in habitaciones]
 
     def actualizar_lista_reservas(self):
-        # Verificar si el TreeView está disponible
-        if not hasattr(self, 'reserva_tree') or not self.reserva_tree.winfo_exists():
-            print("El TreeView no está disponible o ha sido destruido.")
-            return  # Evita errores si el TreeView no existe
+        try:
+            if not hasattr(self, 'reserva_tree') or not self.reserva_tree.winfo_exists():
+                print("El TreeView no está disponible o ha sido destruido.")
+                return
+        except Exception as e:
+            print(f"Error al acceder al TreeView: {e}")
+            return
         
         # Limpiar los elementos del TreeView
         for item in self.reserva_tree.get_children():
@@ -322,14 +702,8 @@ class HotelApp(ctk.CTk):
         # Insertar cada reserva en el TreeView
         for res in reservas:
             print(f"Insertando reserva: {res.id}, {res.huesped.nombre}, {res.habitacion.numero}")
-            self.reserva_tree.insert("", "end", values=(
-                res.id,
-                res.huesped.nombre,
-                res.habitacion.numero,
-                res.fecha_entrada.strftime("%Y-%m-%d"),
-                res.fecha_salida.strftime("%Y-%m-%d"),
-                res.estado
-            ))
+            self.reserva_tree.insert("", "end", values=(res.id, res.huesped.nombre, res.habitacion.numero, res.fecha_entrada.strftime("%Y-%m-%d"), res.fecha_salida.strftime("%Y-%m-%d"), res.estado))
+
 
     # Al momento de crear la reserva, extraemos el rut
     def crear_reserva(self):
@@ -351,6 +725,8 @@ class HotelApp(ctk.CTk):
             if not huesped:
                 raise ValueError(f"El huésped con rut {huesped_rut} no existe")
             
+            
+            
             # Obtener las fechas
             fecha_entrada = datetime.strptime(self.reserva_fecha_entrada.get(), "%Y-%m-%d")
             fecha_salida = datetime.strptime(self.reserva_fecha_salida.get(), "%Y-%m-%d")
@@ -367,29 +743,52 @@ class HotelApp(ctk.CTk):
             # Si no se encuentra una habitación disponible de ese tipo, buscar una habitación de cualquier tipo
             if not habitaciones_disponibles:
                 habitaciones_disponibles = self.db.query(Habitacion).filter(
-                    Habitacion.disponible == True
-                ).first()  # Buscar cualquier habitación disponible
+                Habitacion.disponible == True
+                ).first()
 
             # Si no hay habitaciones disponibles en general, lanzar error
             if not habitaciones_disponibles:
-                raise ValueError("No hay habitaciones disponibles en este momento")
+             raise ValueError("No hay habitaciones disponibles en este momento")
+
+
+            # === Aplicar estrategia de precio dinámica según selección ===
+            tipo = self.tipo_precio.get()
+
+            if tipo == "Normal":
+                estrategia = PrecioNormal()
+            elif tipo == "Con Descuento":
+                estrategia = PrecioConDescuento()
+            elif tipo == "Con IVA":
+                estrategia = PrecioConIVA()
+            else:
+                raise ValueError("Tipo de precio no válido")
+
+            precio_final = estrategia.calcular_precio(habitaciones_disponibles.precio)
+            messagebox.showinfo("Precio final", f"Precio final de la habitación: ${precio_final:.2f}")
 
             # Crear la reserva
-            ReservaCRUD.crear_reserva(
-                self.db,
-                huesped_id=huesped.id,  # Aquí usamos el ID del huésped correctamente
-                habitacion_id=habitaciones_disponibles.id,
+            builder = HotelBuilder()
+            reserva_data = builder.set_reserva(
+                huesped=huesped,
+                habitacion=habitaciones_disponibles,
                 fecha_entrada=fecha_entrada,
-                fecha_salida=fecha_salida
-            )
-            
-            # Actualizar disponibilidad de la habitación
+                fecha_salida=fecha_salida,
+                precio_final=precio_final
+            ).get_result()
+
+            reserva_obj = reserva_data["reserva"]
+
+            # Guardar en la base de datos
+            self.db.add(reserva_obj)
+
+            # Marcar la habitación como no disponible
             habitaciones_disponibles.disponible = False
             self.db.commit()
             
             messagebox.showinfo("Éxito", "Reserva creada correctamente")
-            self.actualizar_lista_reservas()
-            self.actualizar_lista_habitaciones()
+            
+            if hasattr(self, 'reserva_tree') and self.reserva_tree.winfo_exists():
+                self.actualizar_lista_reservas()
             
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo crear la reserva: {str(e)}")
@@ -412,7 +811,8 @@ class HotelApp(ctk.CTk):
         try:
             ReservaCRUD.eliminar_reserva(self.db, reserva_id=int(reserva_id))
             messagebox.showinfo("Éxito", "Reserva eliminada correctamente")
-            self.actualizar_lista_reservas()
+            if hasattr(self, 'reserva_tree') and self.reserva_tree.winfo_exists():
+                self.actualizar_lista_reservas()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo eliminar la reserva: {str(e)}")
 
@@ -491,7 +891,7 @@ class HotelApp(ctk.CTk):
                 self.huesped_email.insert(0, huesped.email)
             self.huesped_telefono.delete(0, "end")
             if huesped.telefono:
-                self.huesped_telefono.insert(0, huesped.telefono)
+                self.huesped_telefono.insert(0, "end", huesped.telefono)
         else:
             messagebox.showinfo("Información", "No se encontró el huésped")
 
@@ -555,6 +955,12 @@ class HotelApp(ctk.CTk):
             messagebox.showerror("Error", "Precio debe ser un número válido")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo modificar la habitación: {str(e)}")
+
+
+
+
+
+
 
 if __name__ == "__main__":
     app = HotelApp()
