@@ -159,11 +159,11 @@ class ModuleLauncherApp(ctk.CTk):
                 text="Abrir Módulo",
                 command=lambda m=module: self.launch_module(m["file"]),
                 fg_color=module["color"],
-                hover_color=f"{module['color']}90",
+                hover_color=module["color"],  # ✅ corregido
                 font=("Arial", 14),
                 height=40,
                 corner_radius=10
-            ).pack(pady=(0, 15), padx=20, fill="x")
+            ).pack(pady=(0, 15), padx=20, fill="x")     
         
     def launch_module(self, module_file):
         # Ruta relativa a la subcarpeta ProyectoNuevo
