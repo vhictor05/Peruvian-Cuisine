@@ -168,9 +168,7 @@ class CalculadoraPrecio {
 }
 CalculadoraPrecio --> PrecioStrategy
 
-class PrecioStrategyFactory {
-  +obtener_estrategia(tipo: str): PrecioStrategy
-}
+
 
 class Huesped {
   +id: int
@@ -225,6 +223,90 @@ Habitacion "*" --* "*" DetalleReservaHabitacion
 
 
 ' ==== RESTAURANTE ====
+
+
+' ==== Observer Interfaces ====
+interface Observer {
+  +update(event: String, data: Object): void
+}
+
+interface Subject {
+  +register(observer: Observer): void
+  +unregister(observer: Observer): void
+  +notify(event: String, data: Object): void
+}
+
+class ObserverManager implements Subject {
+  -observers: List<Observer>
+  +register(observer: Observer)
+  +unregister(observer: Observer)
+  +notify(event: String, data: Object)
+}
+
+' ==== Paneles que observan cambios en Restaurante ====
+class IngredientePanel implements Observer
+class MenuPanel implements Observer
+class PanelCompra implements Observer
+
+ObserverManager "1" *-- "*" Observer : manages >
+
+' ==== Factory Method para paneles ====
+interface Panel {
+  +render(): void
+}
+
+class PanelFactory {
+  +create_panel(name: String): Panel
+}
+
+PanelFactory ..> Panel
+PanelFactory ..> IngredientePanel
+PanelFactory ..> MenuPanel
+PanelFactory ..> PanelCompra
+
+IngredientePanel ..|> Panel
+MenuPanel ..|> Panel
+PanelCompra ..|> Panel
+
+' ==== Builder para boleta ====
+interface Builder {
+  +reset(): void
+  +buildHeader(): void
+  +buildItems(): void
+  +buildFooter(): void
+  +getResult(): Object
+}
+
+class BoletaBuilder implements Builder {
+  -pdfDocument: Object
+  +reset()
+  +buildHeader()
+  +buildItems()
+  +buildFooter()
+  +getResult()
+}
+
+class BoletaDirector {
+  -builder: Builder
+  +constructFullBoleta(order: Object)
+}
+
+BoletaDirector --> Builder
+BoletaBuilder ..|> Builder
+BoletaDirector --> Pedido
+
+' ==== Clases Restaurante ====
+class Restaurante {
+  +clientes: List<Cliente>
+  +menu: List<Menu>
+  +pedidos: List<Pedido>
+  +reservas: List<ReservaRestaurante>
+  +mesas: List<Mesa>
+  +mostrar_menu(): void
+  +reservar(): void
+  +comprar(): void
+}
+
 class Cliente {
   +id: int
   +nombre: str
@@ -270,16 +352,7 @@ class DetalleReservaMesa {
   +comentario: str
 }
 
-class Restaurante {
-  +clientes: List<Cliente>
-  +Menu: List<Menu>
-  +pedidos: List<Pedido>
-  +reservas: List<ReservaRestaurante>
-  +mesas: List<Mesa>
-  +mostrar_menu(): void
-  +reservar(): void
-  +comprar(): void
-}
+
 Restaurante ..|> IServicio
 
 Restaurante *-- "0..*" Pedido
@@ -293,6 +366,11 @@ ReservaRestaurante "*" --* "1" Cliente
 ReservaRestaurante "*" --* "*" DetalleReservaMesa
 Mesa "*" --* "*" DetalleReservaMesa
 
+' Conexión: Restaurante usa ObserverManager para notificar cambios a paneles
+Restaurante ..> ObserverManager : usa >
+
+' PanelCompra recibe notificaciones de ObserverManager
+PanelCompra --> ObserverManager : recibe >
 
 
 
