@@ -18,7 +18,7 @@ import tkinter as tk
 import matplotlib.pyplot as plt
 from graficos import  graficar_menus_mas_comprados, graficar_uso_ingredientes,graficar_ventas_por_fecha
 from restaurant_observer import ObserverManager  # Importar el gestor de observers
-
+from facade.compra_facade import CompraFacade
 # Configuración global de estilos
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -1028,38 +1028,8 @@ class MenuPanel(ctk.CTkFrame):
         self.button_frame = ctk.CTkFrame(self, fg_color="#25253a")
         self.button_frame.grid(row=5, column=0, pady=10, sticky="ew")
 
-        self.add_button = ctk.CTkButton(
-            self.button_frame, 
-            text="Registrar Menú", 
-            command=self.add_menu, 
-            corner_radius=15,
-            fg_color="#4361ee",
-            hover_color="#5a75f0"
-        )
-        self.add_button.grid(row=0, column=0, padx=5)
-
-        self.update_button = ctk.CTkButton(
-            self.button_frame, 
-            text="Editar Menú", 
-            command=self.open_edit_window, 
-            corner_radius=15,
-            fg_color="#4361ee",
-            hover_color="#5a75f0"
-        )
-        self.update_button.grid(row=0, column=1, padx=5)
-
-        self.delete_button = ctk.CTkButton(
-            self.button_frame, 
-            text="Eliminar Menú", 
-            command=self.delete_menu, 
-            corner_radius=15,
-            fg_color="#4361ee",
-            hover_color="#5a75f0"
-        )
-        self.delete_button.grid(row=0, column=2, padx=5)
-
         self.menu_list = self.create_treeview(Menu)
-        self.menu_list.grid(row=6, column=0, pady=20, sticky="nsew")
+        self.menu_list.grid(row=10, column=0, pady=40, sticky="nsew")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(6, weight=1)
         self.refresh_list()
@@ -1478,7 +1448,7 @@ class PanelCompra(ctk.CTkFrame):
         super().__init__(parent)
         self.db = db  
         self.carrito = []  # Lista para almacenar los productos del carrito
-        self.observer_manager = observer_manager  # Agregar observer manager
+        self.facade = CompraFacade(db, observer_manager)
         self.configure(fg_color="#25253a")
 
         # Título del Panel de Compra
@@ -1698,47 +1668,12 @@ class PanelCompra(ctk.CTkFrame):
             messagebox.showerror("Error", "Por favor, selecciona un cliente.")
             return
 
-        # TODO: Implementar descuento automático de ingredientes y notificación
-        menus = []
-        for item in self.cart:
-            menu_nombre, cantidad, _ = item
-            menu = MenuCRUD.get_menu_by_nombre(self.db, menu_nombre)
-            if menu:
-                if not self.verificar_disponibilidad_ingredientes(menu, cantidad):
-                    messagebox.showerror("Error", f"No hay suficientes ingredientes para el menú '{menu_nombre}'.")
-                    return
-                menus.append({"id": menu.id, "cantidad": cantidad})
-
-        nuevo_pedido = PedidoCRUD.crear_pedido(
-            self.db,
-            cliente_rut=cliente_rut,
-            descripcion="Compra Realizada",
-            total=sum(item[2] for item in self.cart),
-            fecha=datetime.now(),
-            menus=menus
-        )
+        nuevo_pedido = self.facade.procesar_compra(cliente_rut, self.cart)
 
         if nuevo_pedido:
-            # TODO: Notificar nuevo pedido usando observer
-            if self.observer_manager:
-                self.observer_manager.notify_new_order(nuevo_pedido)
-            
-            generador_boleta = Generarboleta(nuevo_pedido, self.db)
-            generador_boleta.generar_boleta()
-        for pedido_item in self.carrito:
-            for mi in pedido_item.menu.menu_ingredientes:
-                ing = mi.ingrediente
-                cantidad_usada = mi.cantidad
-                nueva_cantidad = ing.cantidad - cantidad_usada
-                self.observer_manager.notify_inventory_change(ing.nombre, ing.cantidad, nueva_cantidad)
-                ing.cantidad = nueva_cantidad
-
             messagebox.showinfo("Compra Realizada", "¡Gracias por tu compra!")
-            
             self.cart.clear()
             self.refresh_cart_list()
-            self.db.add(nuevo_pedido)
-            self.db.commit()
         else:
             messagebox.showerror("Error", "No se pudo realizar la compra.")
 
@@ -2267,58 +2202,6 @@ class BoletaDirector:
                 .build_totals()
                 .save_pdf(filename))
 
-
-class Generarboleta:
-    def __init__(self, pedido, db):
-        self.pedido = pedido
-        self.db = db
-        # Inicializar el builder y director
-        self.builder = BoletaBuilder()
-        self.director = BoletaDirector(self.builder)
-
-    def generar_boleta(self):
-        if not self.pedido.menus:
-            messagebox.showwarning("Pedido Vacío", "No hay menús en el pedido para generar la boleta.")
-            return
-
-        try:
-            # Usar el patrón Builder para generar la boleta
-            filename = self.director.construct_complete_boleta(
-                self.pedido, 
-                self.db, 
-                "boleta.pdf"
-            )
-            
-            messagebox.showinfo(
-                "Boleta Generada", 
-                f"Boleta generada con éxito en la siguiente ruta: '{filename}'.",
-                icon="check"
-            )
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al generar la boleta: {str(e)}")
-    
-    def generar_boleta_simple(self):
-        """Método adicional para generar una boleta simple"""
-        if not self.pedido.menus:
-            messagebox.showwarning("Pedido Vacío", "No hay menús en el pedido para generar la boleta.")
-            return
-
-        try:
-            filename = self.director.construct_simple_boleta(
-                self.pedido, 
-                self.db, 
-                "boleta_simple.pdf"
-            )
-            
-            messagebox.showinfo(
-                "Boleta Simple Generada", 
-                f"Boleta simple generada con éxito en la siguiente ruta: '{filename}'.",
-                icon="check"
-            )
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al generar la boleta simple: {str(e)}")
 
 if __name__ == "__main__":
     app = MainApp()
