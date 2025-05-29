@@ -131,6 +131,47 @@ PedidoBuilder --> PedidoBar
 
 
 ' ==== HOTEL (CENTRAL) ====
+class HotelFacade {
+  +crear_huesped(...)
+  +crear_habitacion(...)
+  +guardar_reserva(...)
+  +eliminar_reserva(...)
+  +obtener_huesped_por_rut(...)
+  +obtener_todas_reservas()
+}
+HotelFacade *-- Huesped
+HotelFacade *-- Habitacion
+HotelFacade *-- Reserva
+
+class HotelBuilder {
+  +set_reserva(...)
+  +set_estado(...)
+  +get_result()
+}
+HotelBuilder --> Reserva
+
+interface PrecioStrategy {
+  +calcular(precio_base): float
+}
+
+class PrecioNormalStrategy
+class PrecioConDescuentoStrategy
+class PrecioConIVAstrategy
+
+PrecioNormalStrategy ..|> PrecioStrategy
+PrecioConDescuentoStrategy ..|> PrecioStrategy
+PrecioConIVAstrategy ..|> PrecioStrategy
+
+class CalculadoraPrecio {
+  -estrategia: PrecioStrategy
+  +calcular(precio_base): float
+}
+CalculadoraPrecio --> PrecioStrategy
+
+class PrecioStrategyFactory {
+  +obtener_estrategia(tipo: str): PrecioStrategy
+}
+
 class Huesped {
   +id: int
   +nombre: str
@@ -145,7 +186,11 @@ class Reserva {
   +fecha_entrada: date
   +fecha_salida: date
   +estado: str
+  -estrategia_precio: PrecioStrategy
+  +set_estrategia(estrategia: PrecioStrategy): void
+  +calcular_precio(): float
 }
+Reserva --> PrecioStrategy : usa >
 
 class Habitacion {
   +id: int
@@ -324,7 +369,7 @@ class CrearReporteOperacion
 class ActualizarEstadoOperacion
 class EliminarReporteOperacion
 
-ReporteService ..> OperacionReporte : usa >>
+ReporteService ..> OperacionReporte 
 OperacionReporte <|-- CrearReporteOperacion
 OperacionReporte <|-- ActualizarEstadoOperacion
 OperacionReporte <|-- EliminarReporteOperacion
