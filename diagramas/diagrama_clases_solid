@@ -374,5 +374,4 @@ OperacionReporte <|-- CrearReporteOperacion
 OperacionReporte <|-- ActualizarEstadoOperacion
 OperacionReporte <|-- EliminarReporteOperacion
 
-
 @enduml
