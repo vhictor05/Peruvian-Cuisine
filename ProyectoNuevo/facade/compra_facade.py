@@ -4,7 +4,7 @@ from crud.pedido_crud import PedidoCRUD
 from crud.ingrediente_crud import IngredienteCRUD
 from crud.menu_crud import MenuCRUD
 from fpdf import FPDF
-from generar_boleta import Generarboleta  
+from Hotel.generar_boleta import Generarboleta  
 from datetime import datetime
 
 class CompraFacade:

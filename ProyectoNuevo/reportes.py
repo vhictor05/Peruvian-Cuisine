@@ -3,9 +3,9 @@ from tkinter import messagebox
 from datetime import datetime
 from abc import ABC, abstractmethod
 from sqlalchemy.orm import Session
-from database import get_db, engine
+from Restaurante.database import get_db, engine
 from models_folder.models_reporte import ReporteError
-from report_database import get_report_db, init_report_db
+from Reportes.report_database import get_report_db, init_report_db
 
 # Configuración de la interfaz
 ctk.set_appearance_mode("dark")

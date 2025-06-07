@@ -4,12 +4,12 @@ import re
 from tkinter import messagebox, ttk
 from datetime import datetime
 from sqlalchemy.orm import Session
-from hotel_database import get_db, Base, recreate_db, engine
+from Hotel.hotel_database import get_db, Base, recreate_db, engine
 from models_folder.models_hotel import Huesped, Habitacion, Reserva
 from datetime import datetime, timedelta
 from tkcalendar import DateEntry, Calendar
 from facade.hotel_facade import HotelFacade
-from hotel_estrategy import PrecioStrategyFactory, CalculadoraPrecio
+from estrategy.hotel_estrategy import PrecioStrategyFactory, CalculadoraPrecio
 from builder.hotel_builder import HotelBuilder
 #recreate_db()  Recreate the database with the new schema
 Base.metadata.create_all(bind=engine)
