@@ -50,5 +50,14 @@ class HotelFacade:
 
     def actualizar_reserva(self, reserva_id, **kwargs):
         return ReservaCRUD.actualizar_reserva(self.db, reserva_id, **kwargs)
+    
+    def guardar_reserva(self, reserva_obj):
+        """Guarda un objeto Reserva ya construido"""
+        self.db.add(reserva_obj)
+        # marcar habitación como no disponible
+        if reserva_obj.habitacion:
+            reserva_obj.habitacion.disponible = False
+        self.db.commit()
+
 
 
