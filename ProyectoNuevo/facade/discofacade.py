@@ -29,8 +29,14 @@ class DiscotecaFacade:
     def registrar_cliente(self, cliente_data):
         return ClienteDiscotecaCRUD.crear(self.db, cliente_data)
 
+    def editar_cliente(self, cliente_id, nuevos_datos):
+        return ClienteDiscotecaCRUD.actualizar(self.db, cliente_id, nuevos_datos)
+
     def eliminar_cliente(self, cliente_id):
         return ClienteDiscotecaCRUD.eliminar(self.db, cliente_id)
+
+    def actualizar_cliente(self, cliente_id, nuevos_datos):
+        return ClienteDiscotecaCRUD.actualizar(self.db, cliente_id, nuevos_datos)
 
     def obtener_cliente_por_rut(self, rut):
         return ClienteDiscotecaCRUD.obtener_por_rut(self.db, rut)
