@@ -13,6 +13,7 @@ from crud.trago_crud import TragoCRUD
 from facade.discofacade import DiscotecaFacade
 from builder.pedido_builder import PedidoBuilder
 import re
+from datetime import datetime
 
 
 # ====== VALIDADORES ======
@@ -402,7 +403,8 @@ class DiscotecaApp(ctk.CTk):
             background="#7209b7",
             foreground="white",
             selectbackground="#9d4dc7",
-            selectforeground="white"
+            selectforeground="white",
+            mindate=datetime.now().date()
         )
         calendario_evento.pack(pady=5)
 
@@ -456,15 +458,10 @@ class DiscotecaApp(ctk.CTk):
 
         def confirmar_fecha_hora():
             try:
-                fecha_str = calendario_evento.get_date()  # Esto devuelve un string
+                fecha_str = calendario_evento.get_date()
                 hora = int(hora_spinbox.get())
                 minuto = int(minuto_spinbox.get())
-                
-                # Convertir el string de fecha a objeto datetime.date
-                from datetime import datetime
                 fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-                
-                # Crear datetime completo
                 fecha_hora_evento = datetime(
                     year=fecha.year,
                     month=fecha.month,
@@ -472,6 +469,10 @@ class DiscotecaApp(ctk.CTk):
                     hour=hora,
                     minute=minuto
                 )
+                # Validar fecha y hora futura
+                if fecha_hora_evento < datetime.now():
+                    messagebox.showerror("Error", "No puedes seleccionar una fecha y hora anterior a la actual.")
+                    return
                 
                 # Actualizar el entry con la fecha y hora seleccionada
                 fecha_formateada = fecha_hora_evento.strftime("%Y-%m-%d %H:%M")
