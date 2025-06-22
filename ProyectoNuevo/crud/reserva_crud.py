@@ -64,13 +64,16 @@ class ReservaCRUD:
 
         return reserva_existente is None
 
-    
     @staticmethod
     def eliminar_reserva(db: Session, reserva_id: int):
         reserva = db.query(Reserva).filter(Reserva.id == reserva_id).first()
         if not reserva:
             raise ValueError("La reserva no existe")
         try:
+            # Marcar la habitación como disponible antes de eliminar la reserva
+            habitacion = db.query(Habitacion).filter(Habitacion.id == reserva.habitacion_id).first()
+            if habitacion:
+                habitacion.disponible = True
             db.delete(reserva)
             db.commit()
         except Exception as e:

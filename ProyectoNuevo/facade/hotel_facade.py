@@ -1,6 +1,7 @@
 from crud.huesped_crud import HuespedCRUD
 from crud.habitacion_crud import HabitacionCRUD
 from crud.reserva_crud import ReservaCRUD
+from models_folder.models_hotel import Reserva, Habitacion, Huesped
 
 class HotelFacade:
     def __init__(self, db_session):
@@ -46,7 +47,16 @@ class HotelFacade:
         return ReservaCRUD.obtener_todas_reservas(self.db)
 
     def eliminar_reserva(self, reserva_id):
-        return ReservaCRUD.eliminar_reserva(self.db, reserva_id)
+        reserva = self.db.query(Reserva).get(reserva_id)
+        if not reserva:
+            raise ValueError("La reserva no existe")
+        # Marca la habitación como disponible
+        habitacion = self.db.query(Habitacion).get(reserva.habitacion_id)
+        if habitacion:
+            habitacion.disponible = True
+        self.db.delete(reserva)
+        self.db.commit()
+        return True
 
     def actualizar_reserva(self, reserva_id, **kwargs):
         return ReservaCRUD.actualizar_reserva(self.db, reserva_id, **kwargs)

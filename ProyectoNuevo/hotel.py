@@ -664,7 +664,7 @@ class HotelApp(ctk.CTk):
     def abrir_calendario(self):
         ventana_calendario = ctk.CTkToplevel()
         ventana_calendario.title("Seleccionar Fechas")
-        ventana_calendario.geometry("600x350")  # Ajusta el tamaño de la ventana
+        ventana_calendario.geometry("750x350")  # Ajusta el tamaño de la ventana
 
         ctk.CTkLabel(ventana_calendario, text="Fecha Entrada:").grid(row=0, column=0, padx=10, pady=10)
         calendario_entrada = Calendar(
@@ -784,6 +784,7 @@ class HotelApp(ctk.CTk):
 
             messagebox.showinfo("Éxito", "Reserva creada correctamente")
             self.actualizar_lista_reservas()
+            self.actualizar_lista_habitaciones()
 
             builder = HotelBuilder()
             reserva_data = builder.set_reserva(
@@ -793,7 +794,7 @@ class HotelApp(ctk.CTk):
                 fecha_salida=fecha_salida,
                 precio_final=precio_final
             ).set_estado("Confirmada").get_result()
-
+            
             reserva_obj = reserva_data["reserva"]
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo crear la reserva: {str(e)}")
@@ -836,7 +837,8 @@ class HotelApp(ctk.CTk):
 
             messagebox.showinfo("Éxito", "Reserva modificada correctamente")
             self.actualizar_lista_reservas()
-
+            self.actualizar_lista_habitaciones()
+            
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo modificar la reserva: {str(e)}")
 
@@ -857,10 +859,13 @@ class HotelApp(ctk.CTk):
             return
 
         try:
-            self.hotel_facade.eliminar_reserva(self.db, reserva_id=int(reserva_id))
+            self.hotel_facade.eliminar_reserva(int(reserva_id))
             messagebox.showinfo("Éxito", "Reserva eliminada correctamente")
             if hasattr(self, 'reserva_tree') and self.reserva_tree.winfo_exists():
                 self.actualizar_lista_reservas()
+            # NUEVO: actualiza también la lista de habitaciones
+            if hasattr(self, 'habitacion_tree') and self.habitacion_tree.winfo_exists():
+                self.actualizar_lista_habitaciones()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo eliminar la reserva: {str(e)}")
 
