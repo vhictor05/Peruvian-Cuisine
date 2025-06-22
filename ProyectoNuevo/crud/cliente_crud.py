@@ -40,23 +40,17 @@ class ClienteCRUD:
             return None
 
     @staticmethod
-    def update_cliente(db: Session, rut: str, nuevo_nombre: str, nuevo_email: str):
-        try:
-            cliente = db.query(Cliente).filter_by(rut=rut).first()
-            if not cliente: #Si no se cumple lo del rut, no existe el cliente en la base de datos 
-                logging.error(f"No se encontró el cliente con el rut '{rut}'.")
-                return None
-
-            cliente.nombre = nuevo_nombre
-            cliente.email = nuevo_email
+    def update_cliente(db, rut_anterior, nombre, email, rut_nuevo=None):
+        # Si rut_nuevo no se usa (no se permite editar el rut), ignóralo
+        cliente = db.query(Cliente).filter(Cliente.rut == rut_anterior).first()
+        if cliente:
+            cliente.nombre = nombre
+            cliente.email = email
+            # No actualiza el rut
             db.commit()
-            db.refresh(cliente)
             return cliente
+        return None
 
-        except SQLAlchemyError as e:
-            db.rollback()
-            logging.error(f"Error al actualizar cliente: {e}")
-            return None
 
     @staticmethod
     def delete_cliente(db, rut):
