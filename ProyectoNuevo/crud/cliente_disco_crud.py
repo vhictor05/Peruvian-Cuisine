@@ -1,15 +1,31 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from models_folder.models_disco import ClienteDiscoteca
 from typing import Optional
 
 class ClienteDiscotecaCRUD:
     @staticmethod
     def crear(db: Session, cliente_data: dict) -> ClienteDiscoteca:
+        rut = cliente_data.get("rut", "")
+        telefono = cliente_data.get("telefono", "")
+
+        # Validar que el RUT solo tenga dígitos
+        if not rut.isdigit():
+            raise ValueError("El RUT debe contener solo números.")
+        # Validar que el teléfono solo tenga dígitos
+        if not telefono.isdigit():
+            raise ValueError("El teléfono debe contener solo números.")
+
         cliente = ClienteDiscoteca(**cliente_data)
-        db.add(cliente)
-        db.commit()
-        db.refresh(cliente)
-        return cliente
+        try:
+            db.add(cliente)
+            db.commit()
+            db.refresh(cliente)
+            return cliente
+        except IntegrityError:
+            db.rollback()
+            raise ValueError("El cliente ya está registrado con ese RUT.")
+
 
     @staticmethod
     def obtener_todos(db: Session) -> list[ClienteDiscoteca]:

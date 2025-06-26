@@ -8,7 +8,7 @@ from crud.ingrediente_crud import IngredienteCRUD
 from crud.cliente_crud import ClienteCRUD
 from crud.menu_crud import MenuCRUD
 from crud.pedido_crud import PedidoCRUD
-from database import get_db, engine, Base
+from Restaurante.database import get_db, engine, Base
 from models_folder.models_restaurente import Pedido,Ingrediente,Cliente,MenuIngrediente,Pedido,Menu
 from tkinter import ttk
 from fpdf import FPDF
@@ -16,8 +16,8 @@ from tkinter import messagebox as CTkM
 from datetime import datetime
 import tkinter as tk
 import matplotlib.pyplot as plt
-from graficos import  graficar_menus_mas_comprados, graficar_uso_ingredientes,graficar_ventas_por_fecha
-from restaurant_observer import ObserverManager  # Importar el gestor de observers
+from Restaurante.graficos import  graficar_menus_mas_comprados, graficar_uso_ingredientes,graficar_ventas_por_fecha
+from observer.restaurant_observer import ObserverManager  # Importar el gestor de observers
 from facade.compra_facade import CompraFacade
 # Configuración global de estilos
 ctk.set_appearance_mode("dark")

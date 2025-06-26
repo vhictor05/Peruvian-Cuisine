@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime
-from report_database import ReportBase  # Cambiado de database a report_database
+from Reportes.report_database import ReportBase  # Cambiado de database a report_database
 from datetime import datetime
 
 class ReporteError(ReportBase):  # Usar ReportBase en lugar de Base
