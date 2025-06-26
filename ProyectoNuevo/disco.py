@@ -2,7 +2,7 @@ import customtkinter as ctk
 from tkinter import messagebox, ttk
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from Disco.disco_database import get_db, engine, Base
+from Database.DB import get_db, engine, Base
 from models_folder.models_disco import Trago, PedidoTrago, Evento, ClienteDiscoteca, Entrada, Mesa, ReservaMesa
 from crud.evento_crud import EventoCRUD
 from crud.cliente_disco_crud import ClienteDiscotecaCRUD

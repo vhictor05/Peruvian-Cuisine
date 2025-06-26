@@ -8,7 +8,7 @@ from crud.ingrediente_crud import IngredienteCRUD
 from crud.cliente_crud import ClienteCRUD
 from crud.menu_crud import MenuCRUD
 from crud.pedido_crud import PedidoCRUD
-from Restaurante.database import get_db, engine, Base
+from Database.DB import get_db, engine, Base
 from models_folder.models_restaurente import Pedido,Ingrediente,Cliente,MenuIngrediente,Pedido,Menu
 from tkinter import ttk
 from fpdf import FPDF

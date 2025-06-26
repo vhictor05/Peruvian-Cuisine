@@ -4,7 +4,7 @@ import re
 from tkinter import messagebox, ttk
 from datetime import datetime
 from sqlalchemy.orm import Session
-from Hotel.hotel_database import get_db, Base, recreate_db, engine
+from Database.DB import get_db, Base,engine
 from models_folder.models_hotel import Huesped, Habitacion, Reserva
 from datetime import datetime, timedelta
 from tkcalendar import DateEntry, Calendar

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, JSON, Boolean
 from sqlalchemy.orm import relationship
-from Disco.disco_database import Base
+from Database.DB import Base
 from datetime import datetime
 
 class Evento(Base):

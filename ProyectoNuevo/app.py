@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 # Configuración de la interfaz
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
-
+      
 class ModuleLauncherApp(ctk.CTk):
     def __init__(self):
         super().__init__()

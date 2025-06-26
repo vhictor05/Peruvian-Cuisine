@@ -1,6 +1,6 @@
 from Reportes.infraestructura import SQLAlchemyReporteRepository
 from Reportes.aplicacion import ReporteService
-from Reportes.report_database import get_report_db, init_report_db
+from Database.DB import get_report_db, init_report_db
 
 class ReporteFacade:
     def __init__(self):
