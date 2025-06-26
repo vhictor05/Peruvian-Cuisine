@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, JSON
 from sqlalchemy.orm import relationship
-from database import Base
+from Restaurante.database import Base
 
 class Cliente(Base):
     __tablename__ = "clientes"
