@@ -4,13 +4,14 @@ import re
 from tkinter import messagebox, ttk
 from datetime import datetime
 from sqlalchemy.orm import Session
-from hotel_database import get_db, Base, recreate_db, engine
+from Hotel.hotel_database import get_db, Base, recreate_db, engine
 from models_folder.models_hotel import Huesped, Habitacion, Reserva
 from datetime import datetime, timedelta
 from tkcalendar import DateEntry, Calendar
 from facade.hotel_facade import HotelFacade
-from hotel_estrategy import PrecioStrategyFactory, CalculadoraPrecio
+from estrategy.hotel_estrategy import PrecioStrategyFactory, CalculadoraPrecio
 from builder.hotel_builder import HotelBuilder
+
 #recreate_db()  Recreate the database with the new schema
 Base.metadata.create_all(bind=engine)
 
@@ -664,7 +665,7 @@ class HotelApp(ctk.CTk):
     def abrir_calendario(self):
         ventana_calendario = ctk.CTkToplevel()
         ventana_calendario.title("Seleccionar Fechas")
-        ventana_calendario.geometry("600x350")  # Ajusta el tamaño de la ventana
+        ventana_calendario.geometry("750x350")  # Ajusta el tamaño de la ventana
 
         ctk.CTkLabel(ventana_calendario, text="Fecha Entrada:").grid(row=0, column=0, padx=10, pady=10)
         calendario_entrada = Calendar(
@@ -784,6 +785,7 @@ class HotelApp(ctk.CTk):
 
             messagebox.showinfo("Éxito", "Reserva creada correctamente")
             self.actualizar_lista_reservas()
+            self.actualizar_lista_habitaciones()
 
             builder = HotelBuilder()
             reserva_data = builder.set_reserva(
@@ -793,7 +795,7 @@ class HotelApp(ctk.CTk):
                 fecha_salida=fecha_salida,
                 precio_final=precio_final
             ).set_estado("Confirmada").get_result()
-
+            
             reserva_obj = reserva_data["reserva"]
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo crear la reserva: {str(e)}")
@@ -804,9 +806,15 @@ class HotelApp(ctk.CTk):
             messagebox.showwarning("Advertencia", "Seleccione una reserva para modificar")
             return
 
-        reserva_id = self.reserva_tree.item(selected_item, "values")[0]
+        reserva_id = int(self.reserva_tree.item(selected_item, "values")[0])
 
         try:
+            # Obtener la reserva actual de la base de datos
+            reserva_actual = self.db.query(Reserva).filter(Reserva.id == reserva_id).first()
+            if not reserva_actual:
+                raise ValueError("Reserva no encontrada")
+
+            # Obtener datos nuevos del formulario
             huesped_info = self.reserva_huesped.get()
             huesped_rut = huesped_info.split("(")[-1].rstrip(")")
             huesped = self.hotel_facade.obtener_huesped_por_rut(huesped_rut)
@@ -819,24 +827,52 @@ class HotelApp(ctk.CTk):
                 raise ValueError("La fecha de salida debe ser posterior a la de entrada")
 
             habitacion_tipo = self.habitacion_tipo.get()
-            habitacion = self.db.query(Habitacion).filter(
-                Habitacion.tipo == habitacion_tipo,
-                Habitacion.disponible == True
-            ).first()
-            if not habitacion:
-                raise ValueError("No hay habitaciones disponibles para ese tipo")
+            habitacion_nueva = self.db.query(Habitacion).filter(Habitacion.tipo == habitacion_tipo).first()
+            if not habitacion_nueva:
+                raise ValueError("No se encontró la habitación del tipo seleccionado")
 
-            self.hotel_facade.actualizar_reserva(
-                reserva_id,
-                huesped_id=huesped.id,
-                habitacion_id=habitacion.id,
-                fecha_entrada=fecha_entrada,
-                fecha_salida=fecha_salida
-            )
+            tipo_precio = self.tipo_precio.get() if hasattr(self, "tipo_precio") else None
+
+            # === Cálculo de precio usando Strategy, siempre desde el precio base de la habitación ===
+            estrategia_precio = PrecioStrategyFactory.obtener_estrategia(tipo_precio)
+            precio_calculado = estrategia_precio.calcular_precio(habitacion_nueva.precio)
+
+            # Armar los campos a actualizar solo si cambiaron
+            campos_a_actualizar = {}
+
+            if huesped.id != reserva_actual.huesped_id:
+                campos_a_actualizar["huesped_id"] = huesped.id
+
+            if habitacion_nueva and habitacion_nueva.id != reserva_actual.habitacion_id:
+                if not habitacion_nueva.disponible:
+                    raise ValueError("No hay habitaciones disponibles para ese tipo")
+                campos_a_actualizar["habitacion_id"] = habitacion_nueva.id
+
+            if fecha_entrada != reserva_actual.fecha_entrada:
+                campos_a_actualizar["fecha_entrada"] = fecha_entrada
+
+            if fecha_salida != reserva_actual.fecha_salida:
+                campos_a_actualizar["fecha_salida"] = fecha_salida
+
+            # Si cambió el tipo de precio o la habitación, actualiza ambos campos
+            if tipo_precio != getattr(reserva_actual, "tipo_precio", None) or habitacion_nueva.id != reserva_actual.habitacion_id:
+                campos_a_actualizar["tipo_precio"] = tipo_precio
+                campos_a_actualizar["precio_final"] = precio_calculado
+            else:
+                # Si sólo cambió el precio (por ejemplo, cambio de tarifa base de la habitación)
+                if precio_calculado != reserva_actual.precio_final:
+                    campos_a_actualizar["precio_final"] = precio_calculado
+
+            if not campos_a_actualizar:
+                messagebox.showinfo("Sin cambios", "No se detectaron cambios en la reserva.")
+                return
+
+            self.hotel_facade.actualizar_reserva(reserva_id, **campos_a_actualizar)
 
             messagebox.showinfo("Éxito", "Reserva modificada correctamente")
             self.actualizar_lista_reservas()
-
+            self.actualizar_lista_habitaciones()
+            
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo modificar la reserva: {str(e)}")
 
@@ -857,10 +893,13 @@ class HotelApp(ctk.CTk):
             return
 
         try:
-            self.hotel_facade.eliminar_reserva(self.db, reserva_id=int(reserva_id))
+            self.hotel_facade.eliminar_reserva(int(reserva_id))
             messagebox.showinfo("Éxito", "Reserva eliminada correctamente")
             if hasattr(self, 'reserva_tree') and self.reserva_tree.winfo_exists():
                 self.actualizar_lista_reservas()
+            # NUEVO: actualiza también la lista de habitaciones
+            if hasattr(self, 'habitacion_tree') and self.habitacion_tree.winfo_exists():
+                self.actualizar_lista_habitaciones()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo eliminar la reserva: {str(e)}")
 
@@ -890,6 +929,11 @@ class HotelApp(ctk.CTk):
             ))
 
     def actualizar_lista_habitaciones(self):
+        # Verifica que el atributo exista antes de usarlo
+        if not hasattr(self, "habitacion_tree") or self.habitacion_tree is None:
+            print("habitacion_tree no está definido en esta instancia.")
+            return
+
         for item in self.habitacion_tree.get_children():
             self.habitacion_tree.delete(item)
             

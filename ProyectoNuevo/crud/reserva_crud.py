@@ -32,7 +32,7 @@ class ReservaCRUD:
             fecha_entrada=fecha_entrada,
             fecha_salida=fecha_salida,
             estado="Confirmada",
-            precio_final=precio_final  # <-- Este es el único agregado
+            precio_final=precio_final  # <-- OK
         )
         try:
             db.add(reserva)
@@ -64,13 +64,16 @@ class ReservaCRUD:
 
         return reserva_existente is None
 
-    
     @staticmethod
     def eliminar_reserva(db: Session, reserva_id: int):
         reserva = db.query(Reserva).filter(Reserva.id == reserva_id).first()
         if not reserva:
             raise ValueError("La reserva no existe")
         try:
+            # Marcar la habitación como disponible antes de eliminar la reserva
+            habitacion = db.query(Habitacion).filter(Habitacion.id == reserva.habitacion_id).first()
+            if habitacion:
+                habitacion.disponible = True
             db.delete(reserva)
             db.commit()
         except Exception as e:
@@ -78,12 +81,32 @@ class ReservaCRUD:
             raise e
 
     @staticmethod
-    def actualizar_reserva(db: Session, reserva_id: int, **kwargs):
+    def actualizar_reserva(db, reserva_id: int, **kwargs):
         reserva = db.query(Reserva).filter(Reserva.id == reserva_id).first()
         if not reserva:
             raise ValueError("Reserva no encontrada")
 
         try:
+            habitacion_anterior_id = reserva.habitacion_id
+            habitacion_nueva_id = kwargs.get("habitacion_id", habitacion_anterior_id)
+
+            # Solo validar y cambiar disponibilidad si la habitación cambia
+            if "habitacion_id" in kwargs and habitacion_nueva_id != habitacion_anterior_id:
+                # Aquí deberías tener tu lógica para validar disponibilidad
+                if not ReservaCRUD.habitacion_disponible(db, habitacion_nueva_id, reserva.fecha_entrada, reserva.fecha_salida):
+                    raise ValueError("No hay habitaciones disponibles para ese tipo")
+
+                # Marcar la habitación anterior como disponible
+                habitacion_anterior = db.query(Habitacion).filter(Habitacion.id == habitacion_anterior_id).first()
+                if habitacion_anterior:
+                    habitacion_anterior.disponible = True
+
+                # Marcar la nueva habitación como no disponible
+                habitacion_nueva = db.query(Habitacion).filter(Habitacion.id == habitacion_nueva_id).first()
+                if habitacion_nueva:
+                    habitacion_nueva.disponible = False
+
+            # Actualizar los campos de la reserva (precio, fechas, etc.)
             for key, value in kwargs.items():
                 setattr(reserva, key, value)
             db.commit()
@@ -91,7 +114,7 @@ class ReservaCRUD:
         except Exception as e:
             db.rollback()
             raise e
-
+        
     @staticmethod
     def obtener_todas_reservas(db: Session):
         return db.query(Reserva).all()

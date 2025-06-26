@@ -1,4 +1,4 @@
-import customtkinter as ctk
+
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from tkinter import messagebox 
@@ -8,7 +8,7 @@ from crud.ingrediente_crud import IngredienteCRUD
 from crud.cliente_crud import ClienteCRUD
 from crud.menu_crud import MenuCRUD
 from crud.pedido_crud import PedidoCRUD
-from database import get_db, engine, Base
+from Restaurante.database import get_db, engine, Base
 from models_folder.models_restaurente import Pedido,Ingrediente,Cliente,MenuIngrediente,Pedido,Menu
 from tkinter import ttk
 from fpdf import FPDF
@@ -16,8 +16,8 @@ from tkinter import messagebox as CTkM
 from datetime import datetime
 import tkinter as tk
 import matplotlib.pyplot as plt
-from graficos import  graficar_menus_mas_comprados, graficar_uso_ingredientes,graficar_ventas_por_fecha
-from restaurant_observer import ObserverManager  # Importar el gestor de observers
+from Restaurante.graficos import  graficar_menus_mas_comprados, graficar_uso_ingredientes,graficar_ventas_por_fecha
+from observer.restaurant_observer import ObserverManager  # Importar el gestor de observers
 from facade.compra_facade import CompraFacade
 # Configuración global de estilos
 ctk.set_appearance_mode("dark")
@@ -363,8 +363,7 @@ class ClientePanel(ctk.CTkFrame):
 
             self.edit_nombre_entry = self.create_form_entry_in_window("Nombre del Cliente:", 1, cliente.nombre)
             self.edit_email_entry = self.create_form_entry_in_window("Email del Cliente:", 2, cliente.email)
-            self.edit_rut_entry = self.create_form_entry_in_window("Rut del Cliente:", 3, cliente.rut)
-            self.edit_rut_entry.configure(state="disabled")
+        
 
             self.save_button = ctk.CTkButton(
                 self.edit_window, 
@@ -396,13 +395,13 @@ class ClientePanel(ctk.CTkFrame):
 
         return entry
     
-    def update_cliente(self, cliente_rut):
+    def update_cliente(self, rut_anterior):
         nombre = self.edit_nombre_entry.get()
         email = self.edit_email_entry.get()
-        rut = self.edit_rut_entry.get()
+        # rut_nuevo = self.edit_rut_entry.get().replace(".", "").strip()  # Ya no será editable
 
         if not nombre or not email:
-            messagebox.showerror("Error", "Todos los campos son obligatorios para actualizar un cliente.")
+            messagebox.showerror("Error", "Todos los campos son obligatorios.")
             return
 
         if not self.validar_nombre(nombre):
@@ -413,13 +412,23 @@ class ClientePanel(ctk.CTkFrame):
             messagebox.showerror("Error", "El correo electrónico no tiene un formato válido.")
             return
 
-        cliente = ClienteCRUD.update_cliente(self.db, rut, nombre, email)
+        # No se valida ni solicita el rut_nuevo, solo se mantiene el anterior
+        cliente = ClienteCRUD.update_cliente(self.db, rut_anterior, nombre, email, rut_anterior)
         if cliente:
-            messagebox.showinfo("Éxito", f"Cliente con RUT '{rut}' actualizado: Nombre '{nombre}', Email '{email}'.")
+            messagebox.showinfo("Éxito", f"Cliente con RUT '{rut_anterior}' actualizado con éxito.")
             self.edit_window.destroy()
         else:
             messagebox.showerror("Error", f"No se pudo actualizar el cliente '{nombre}'.")
         self.refresh_list()
+
+
+        self.edit_rut_entry.insert(0, self.formatear_rut(rut_anterior))
+        import re
+
+    def validar_rut(self, rut):
+        # Acepta formato xx.xxx.xxx-x
+        return re.match(r"^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$", rut) is not None
+
     
     def delete_cliente(self):
         selected_item = self.cliente_list.selection()
@@ -1722,8 +1731,7 @@ class PanelPedido(ctk.CTkFrame):
 
         # Modificar la disposición de los filtros cambiando la columna por fila
         self.cliente_filter = self.create_filter_combobox("Filtrar por Cliente (RUT):", row=0)
-        self.fecha_filter = self.create_filter_entry("Filtrar por Fecha (YYYY-MM-DD):", row=1)
-        self.monto_filter = self.create_filter_entry("Filtrar por Monto Mayor a:", row=2)
+    
 
         # Crear un frame contenedor para los botones
         buttons_container = ctk.CTkFrame(self.filter_frame, fg_color="#1e1e2d", corner_radius=0)
@@ -1765,17 +1773,7 @@ class PanelPedido(ctk.CTkFrame):
         self.btn_frame = ctk.CTkFrame(self, fg_color="#25253a")
         self.btn_frame.grid(row=3, column=0, pady=5, columnspan=3)
 
-        self.btn_edit = ctk.CTkButton(
-            self.btn_frame, 
-            text="Editar Pedido",
-            font=("Arial", 16),
-            command=self.edit_pedido,
-            corner_radius=15,
-            fg_color="#4361ee",
-            hover_color="#5a75f0",
-            height=40
-        )
-        self.btn_edit.grid(row=0, column=1, padx=5)
+        
 
         self.btn_delete = ctk.CTkButton(
             self.btn_frame, 
@@ -1854,31 +1852,9 @@ class PanelPedido(ctk.CTkFrame):
 
     def apply_filters(self):
         cliente_rut = self.cliente_filter.get()
-        fecha = self.fecha_filter.get()
-        monto = self.monto_filter.get()
 
         if cliente_rut and cliente_rut != "Selecciona un cliente":
             pedidos = PedidoCRUD.filtrar_pedidos_por_cliente(self.db, cliente_rut)
-        elif fecha:
-            if cliente_rut or monto:
-                messagebox.showerror("Error", "Solo se puede aplicar un filtro a la vez, porfavor borra los contenidos de los filtros.")
-                return
-            try:
-                datetime.strptime(fecha, "%Y-%m-%d")
-                pedidos = PedidoCRUD.filtrar_pedidos_por_fecha(self.db, fecha)
-            except ValueError:
-                messagebox.showerror("Error", "La fecha debe tener el formato YYYY-MM-DD.")
-                return
-        elif monto:
-            if cliente_rut or fecha:
-                messagebox.showerror("Error", "Solo se puede aplicar un filtro a la vez, porfavor borra los contenidos de los filtros.")
-                return
-            try:
-                monto = float(monto)
-                pedidos = PedidoCRUD.filtrar_pedidos_por_monto_mayor_que(self.db, monto)
-            except ValueError:
-                messagebox.showerror("Error", "El monto debe ser un número.")
-                return
         else:
             pedidos = PedidoCRUD.leer_pedidos(self.db)
 
@@ -1886,8 +1862,7 @@ class PanelPedido(ctk.CTkFrame):
 
     def clear_filters(self):
         self.cliente_filter.set("Selecciona un cliente")
-        self.fecha_filter.delete(0, tk.END)
-        self.monto_filter.delete(0, tk.END)
+
         self.refresh_list()
 
     def refresh_list(self, pedidos=None):
@@ -1899,44 +1874,7 @@ class PanelPedido(ctk.CTkFrame):
             menus = ", ".join([f"{menu['cantidad']}x {MenuCRUD.get_menu_by_id(self.db, menu['id']).nombre}" for menu in pedido.menus])
             self.pedido_list.insert("", "end", values=(pedido.id, pedido.descripcion, pedido.total, pedido.fecha, pedido.cliente_rut,menus))
 
-    def edit_pedido(self):
-        selected_item = self.pedido_list.selection()
-        if not selected_item:
-            CTkM.showwarning("Advertencia", "Selecciona un pedido para editar.")
-            return
-
-        # Obtener el ID del pedido seleccionado
-        pedido_id = self.pedido_list.item(selected_item)['values'][0]
-        pedido = next((p for p in PedidoCRUD.leer_pedidos(self.db) if p.id == pedido_id), None)
-
-        if not pedido:
-            CTkM.showerror("Error", f"No se encontró el pedido con ID {pedido_id}.")
-            return
-
-        # Crear ventana para editar descripción
-        self.edit_window = ctk.CTkToplevel(self)
-        self.edit_window.title("Editar Descripción del Pedido")
-        self.edit_window.geometry("400x200")
-        self.edit_window.configure(fg_color="#1c1c1c")
-
-        # Etiqueta y campo de entrada para la descripción
-        label_desc = ctk.CTkLabel(self.edit_window, text="Nueva Descripción:", font=("Arial", 14))
-        label_desc.grid(row=0, column=0, padx=10, pady=10, sticky="w")
-
-        entry_desc = ctk.CTkEntry(self.edit_window, width=300, corner_radius=10)
-        entry_desc.insert(0, pedido.descripcion)  # Descripción actual
-        entry_desc.grid(row=0, column=1, padx=10, pady=10, sticky="w")
-
-        # Botón para guardar cambios
-        save_button = ctk.CTkButton(
-            self.edit_window,
-            text="Guardar Cambios",
-            command=lambda: self.save_pedido_description(pedido_id, entry_desc.get()),
-            corner_radius=50,
-            fg_color="#4361ee",
-            hover_color="#5a75f0"
-        )
-        save_button.grid(row=1, column=0, columnspan=2, pady=20)
+    
 
     def delete_pedido(self):
         selected_item = self.pedido_list.selection()
@@ -1957,25 +1895,7 @@ class PanelPedido(ctk.CTkFrame):
             except Exception as e:
                 CTkM.showerror("Error", f"Error al eliminar pedido: {e}")
 
-    def on_item_double_click(self, event):
-        self.edit_pedido()
-
-    def save_pedido_description(self, pedido_id, nueva_descripcion):
-        if not nueva_descripcion.strip():
-            CTkM.showerror("Error", "La descripción no puede estar vacía.")
-            return
-
-        try:
-            # Actualizar la descripción usando PedidoCRUD
-            pedido_actualizado = PedidoCRUD.actualizar_pedido(self.db, pedido_id, nueva_descripcion)
-            if pedido_actualizado:
-                self.refresh_list()
-                CTkM.showinfo("Éxito", "La descripción del pedido se actualizó correctamente.")
-                self.edit_window.destroy()  # Cerrar la ventana
-            else:
-                CTkM.showerror("Error", "No se pudo actualizar la descripción del pedido.")
-        except Exception as e:
-            CTkM.showerror("Error", f"Error al actualizar descripción: {e}")
+    
 
     def show_message(self, message):
         # Método para mostrar mensajes de confirmación o error
@@ -1999,7 +1919,7 @@ class GraficosPanel(ctk.CTkFrame):
         # ComboBox para seleccionar el gráfico
         self.tipo_grafico = ctk.CTkComboBox(
             self, 
-            values=["Ventas por Fecha", "Menús más Comprados", "Uso de Ingredientes"],
+            values=["Ventas por Fecha", "Menús más Comprados"],
             height=30,
             width=300, 
             corner_radius=10,
@@ -2037,8 +1957,6 @@ class GraficosPanel(ctk.CTkFrame):
             self.graficar_ventas_por_fecha()
         elif (tipo == "Menús más Comprados"):
             self.graficar_menus_mas_comprados()
-        elif (tipo == "Uso de Ingredientes"):
-            self.graficar_uso_ingredientes()
         else:
             CTkM(title="Error", message="Seleccione un tipo de gráfico válido.", icon="cancel")
 
@@ -2048,8 +1966,6 @@ class GraficosPanel(ctk.CTkFrame):
     def graficar_menus_mas_comprados(self):
         graficar_menus_mas_comprados(self.db)
 
-    def graficar_uso_ingredientes(self):
-        graficar_uso_ingredientes(self.db)
 class BoletaBuilder:
     """Builder para construir boletas PDF paso a paso"""
     
