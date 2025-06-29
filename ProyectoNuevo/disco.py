@@ -2,7 +2,7 @@ import customtkinter as ctk
 from tkinter import messagebox, ttk
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from disco_database import get_db, engine, Base
+from Database.DB import get_db, engine, Base
 from models_folder.models_disco import Trago, PedidoTrago, Evento, ClienteDiscoteca, Entrada, Mesa, ReservaMesa
 from crud.evento_crud import EventoCRUD
 from crud.cliente_disco_crud import ClienteDiscotecaCRUD
@@ -12,11 +12,41 @@ from fpdf import FPDF
 from crud.trago_crud import TragoCRUD
 from facade.discofacade import DiscotecaFacade
 from builder.pedido_builder import PedidoBuilder
+import re
+from datetime import datetime
 
+
+# ====== VALIDADORES ======
+def validar_rut(rut: str, dv: str) -> bool:
+    rut = rut.replace(".", "").replace("-", "")
+    if not rut.isdigit():
+        return False
+    if not dv or len(dv) != 1:
+        return False
+    dv = dv.upper()
+    suma = 0
+    multiplo = 2
+    for c in reversed(rut):
+        suma += int(c) * multiplo
+        multiplo = multiplo + 1 if multiplo < 7 else 2
+    dv_esperado = 11 - (suma % 11)
+    if dv_esperado == 11:
+        dv_esperado = '0'
+    elif dv_esperado == 10:
+        dv_esperado = 'K'
+    else:
+        dv_esperado = str(dv_esperado)
+    return dv == dv_esperado
+
+def validar_telefono(telefono: str) -> bool:
+    return len(telefono) == 9 and telefono.startswith("9") and telefono.isdigit()
+
+def validar_email(email: str) -> bool:
+    patron = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return bool(re.match(patron, email))
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
-
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -25,13 +55,11 @@ class DiscotecaApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Discoteca")
-        self.geometry("870x600")
+        self.geometry("950x600")
         self.configure(fg_color="#1e1e2d")
         self.db: Session = next(get_db())
         self.facade = DiscotecaFacade(self.db)
-
-        
-
+    
         # Configurar el estilo del Treeview al inicio
         style = ttk.Style()
         style.theme_use("default")
@@ -71,14 +99,14 @@ class DiscotecaApp(ctk.CTk):
             text="DISCO",
             font=("Arial", 27, "bold"),
             text_color="#7209b7"
-        ).pack(pady=0, padx=(20,0), anchor="w")  # Añadido padx y anchor="w" (texto a la izquierda)
+        ).pack(pady=0, padx=(20,0), anchor="w")
 
         ctk.CTkLabel(
             self.title_frame,
             text="MANAGER",
-            font=("Arial", 23),  
+            font=("Arial", 23),
             text_color="#9d4dc7"
-        ).pack(pady=0, padx=(20,0), anchor="w")  # Añadido padx y anchor="w" (texto a la izquierda)
+        ).pack(pady=0, padx=(20,0), anchor="w")
 
         # Frame secundario(lateral): Entrada, Clientes y Tragos
         self.menu_frame = ctk.CTkFrame(
@@ -248,42 +276,43 @@ class DiscotecaApp(ctk.CTk):
         )
         self.evento_aforo.grid(row=5, column=1, padx=10, sticky="ew")
 
-        # Fecha (debajo de Precio Entrada)
+        # ===== NUEVO SISTEMA DE FECHA Y HORA =====
+        # Fecha del Evento
         ctk.CTkLabel(
             form_frame, 
-            text="Fecha:", 
+            text="Fecha del Evento:", 
             font=("Arial", 14)
-        ).grid(row=6, column=0, padx=10, pady=(5,0), sticky="w")
+        ).grid(row=6, column=0, padx=10, pady=(10,0), sticky="w")
 
-        self.cal = DateEntry(
+        self.fecha_evento_entry = ctk.CTkEntry(
             form_frame,
-            date_pattern="yyyy-mm-dd",
-            width=12,
-            background="#7209b7",
-            foreground="white",
-            borderwidth=2
+            fg_color="#25253a",
+            border_color="#7209b7",
+            border_width=1,
+            placeholder_text="Seleccione fecha y hora"
         )
-        self.cal.grid(row=7, column=0, padx=10, pady=(0, 10), sticky="w")
+        self.fecha_evento_entry.grid(row=7, column=0, padx=10, pady=(5,10), sticky="ew")
 
-        # Hora (debajo de Aforo Máximo)
-        ctk.CTkLabel(
-            form_frame, 
-            text="Hora:", 
-            font=("Arial", 14)
-        ).grid(row=6, column=1, padx=10, pady=(5,0), sticky="w")
+        # Crear un frame contenedor para centrar el botón
+        boton_fecha_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        boton_fecha_frame.grid(row=7, column=1, pady=(5,10), padx=10, sticky="ew")
 
-        hora_frame = ctk.CTkFrame(form_frame, fg_color="#1e1e2d")
-        hora_frame.grid(row=7, column=1, padx=10, pady=(0,10), sticky="w")
+        # Configurar las columnas para centrar el contenido del frame
+        boton_fecha_frame.columnconfigure(0, weight=1)
+        boton_fecha_frame.columnconfigure(1, weight=1)
+        boton_fecha_frame.columnconfigure(2, weight=1)
 
-        self.hora_spinbox = ttk.Spinbox(hora_frame, from_=0, to=23, width=2, format="%02.0f")
-        self.hora_spinbox.pack(side="left", padx=5)
-        self.hora_spinbox.set("20")
-
-        ctk.CTkLabel(hora_frame, text=":", font=("Arial", 14)).pack(side="left")
-
-        self.minuto_spinbox = ttk.Spinbox(hora_frame, from_=0, to=59, width=2, format="%02.0f")
-        self.minuto_spinbox.pack(side="left", padx=5)
-        self.minuto_spinbox.set("00")
+        # Botón para seleccionar fecha y hora
+        ctk.CTkButton(
+            boton_fecha_frame,
+            text="📅 Seleccionar Fecha y Hora",
+            command=self.abrir_calendario_evento,
+            fg_color="#7209b7",
+            hover_color="#9d4dc7",
+            font=("Arial", 14),
+            corner_radius=10,
+            width=200
+        ).grid(row=0, column=1)
 
         # Frame para botones
         button_frame = ctk.CTkFrame(
@@ -309,7 +338,7 @@ class DiscotecaApp(ctk.CTk):
         ctk.CTkButton(
             button_frame,
             text="🖊 Editar Evento",
-            command=self.editar_evento,
+            command=self.editar_evento,  # Aquí se vincula el método editar_evento
             fg_color="#7209b7",
             hover_color="#9d4dc7",
             font=("Arial", 14),
@@ -336,27 +365,164 @@ class DiscotecaApp(ctk.CTk):
         self.evento_tree.bind("<<TreeviewSelect>>", self.cargar_evento_seleccionado)
         self.actualizar_lista_eventos()
 
-    
+    def abrir_calendario_evento(self):
+        """Abre una ventana para seleccionar fecha y hora del evento"""
+        ventana_calendario = ctk.CTkToplevel()
+        ventana_calendario.title("Seleccionar Fecha y Hora del Evento")
+        ventana_calendario.geometry("500x500")
+        ventana_calendario.configure(fg_color="#1e1e2d")
+        
+        # Hacer que la ventana sea modal
+        ventana_calendario.grab_set()
+        ventana_calendario.focus()
+
+        # Título
+        ctk.CTkLabel(
+            ventana_calendario, 
+            text="Seleccione la fecha y hora del evento",
+            font=("Arial", 16, "bold"),
+            text_color="#7209b7"
+        ).pack(pady=10)
+
+        # Frame para el calendario
+        calendario_frame = ctk.CTkFrame(ventana_calendario, fg_color="#25253a")
+        calendario_frame.pack(pady=10, padx=20, fill="both", expand=True)
+
+        # Calendario
+        ctk.CTkLabel(
+            calendario_frame, 
+            text="Fecha:",
+            font=("Arial", 14)
+        ).pack(pady=(10,5))
+        
+        calendario_evento = Calendar(
+            calendario_frame,
+            date_pattern="yyyy-mm-dd",
+            font=("Arial", 12),
+            selectmode="day",
+            background="#7209b7",
+            foreground="white",
+            selectbackground="#9d4dc7",
+            selectforeground="white",
+            mindate=datetime.now().date()
+        )
+        calendario_evento.pack(pady=5)
+
+        # Frame para hora
+        hora_frame = ctk.CTkFrame(calendario_frame, fg_color="#1e1e2d")
+        hora_frame.pack(pady=20)
+
+        ctk.CTkLabel(
+            hora_frame, 
+            text="Hora:",
+            font=("Arial", 14)
+        ).pack()
+
+        # Frame interno para los spinboxes
+        spinbox_frame = ctk.CTkFrame(hora_frame, fg_color="transparent")
+        spinbox_frame.pack(pady=10)
+
+        # Spinbox para horas
+        hora_spinbox = ttk.Spinbox(
+            spinbox_frame, 
+            from_=0, 
+            to=23, 
+            width=3, 
+            format="%02.0f",
+            font=("Arial", 12)
+        )
+        hora_spinbox.pack(side="left", padx=5)
+        hora_spinbox.set("20")
+
+        ctk.CTkLabel(
+            spinbox_frame, 
+            text=":",
+            font=("Arial", 14)
+        ).pack(side="left")
+
+        # Spinbox para minutos
+        minuto_spinbox = ttk.Spinbox(
+            spinbox_frame, 
+            from_=0, 
+            to=59, 
+            width=3, 
+            format="%02.0f",
+            font=("Arial", 12)
+        )
+        minuto_spinbox.pack(side="left", padx=5)
+        minuto_spinbox.set("00")
+
+        # Frame para botones
+        botones_frame = ctk.CTkFrame(ventana_calendario, fg_color="transparent")
+        botones_frame.pack(pady=20)
+
+        def confirmar_fecha_hora():
+            try:
+                fecha_str = calendario_evento.get_date()
+                hora = int(hora_spinbox.get())
+                minuto = int(minuto_spinbox.get())
+                fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+                fecha_hora_evento = datetime(
+                    year=fecha.year,
+                    month=fecha.month,
+                    day=fecha.day,
+                    hour=hora,
+                    minute=minuto
+                )
+                # Validar fecha y hora futura
+                if fecha_hora_evento < datetime.now():
+                    messagebox.showerror("Error", "No puedes seleccionar una fecha y hora anterior a la actual.")
+                    return
+                
+                # Actualizar el entry con la fecha y hora seleccionada
+                fecha_formateada = fecha_hora_evento.strftime("%Y-%m-%d %H:%M")
+                self.fecha_evento_entry.delete(0, "end")
+                self.fecha_evento_entry.insert(0, fecha_formateada)
+                
+                # Guardar la fecha_hora para uso posterior
+                self.fecha_hora_seleccionada = fecha_hora_evento
+                
+                ventana_calendario.destroy()
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al seleccionar fecha y hora: {str(e)}")
+
+        def cancelar():
+            ventana_calendario.destroy()
+
+        # Botón Confirmar
+        ctk.CTkButton(
+            botones_frame,
+            text="✅ Confirmar",
+            command=confirmar_fecha_hora,
+            fg_color="#7209b7",
+            hover_color="#9d4dc7",
+            font=("Arial", 14),
+            width=120
+        ).pack(side="left", padx=10)
+
+        # Botón Cancelar
+        ctk.CTkButton(
+            botones_frame,
+            text="❌ Cancelar",
+            command=cancelar,
+            fg_color="#666666",
+            hover_color="#777777",
+            font=("Arial", 14),
+            width=120
+        ).pack(side="left", padx=10)
 
     def registrar_evento(self):
         try:
-            # Obtener fecha y hora de los nuevos controles
-            fecha = self.cal.get_date()
-            hora = int(self.hora_spinbox.get())
-            minuto = int(self.minuto_spinbox.get())
-            
-            fecha_hora = datetime(
-                year=fecha.year,
-                month=fecha.month,
-                day=fecha.day,
-                hour=hora,
-                minute=minuto
-            )
+            # Verificar que se haya seleccionado una fecha y hora
+            if not hasattr(self, 'fecha_hora_seleccionada') or not self.fecha_hora_seleccionada:
+                messagebox.showerror("Error", "Por favor seleccione una fecha y hora para el evento")
+                return
             
             evento_data = {
                 "nombre": self.evento_nombre.get(),
                 "descripcion": self.evento_descripcion.get(),
-                "fecha": fecha_hora,
+                "fecha": self.fecha_hora_seleccionada,
                 "precio_entrada": float(self.evento_precio.get()),
                 "aforo_maximo": int(self.evento_aforo.get())
             }
@@ -365,6 +531,16 @@ class DiscotecaApp(ctk.CTk):
             messagebox.showinfo("Éxito", "Evento registrado")
             self.actualizar_lista_eventos()
             
+            # Limpiar campos
+            self.evento_nombre.delete(0, "end")
+            self.evento_descripcion.delete(0, "end")
+            self.evento_precio.delete(0, "end")
+            self.evento_aforo.delete(0, "end")
+            self.fecha_evento_entry.delete(0, "end")
+            self.fecha_hora_seleccionada = None
+            
+        except ValueError as ve:
+            messagebox.showerror("Error", "Por favor ingrese valores numéricos válidos para precio y aforo")
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -377,20 +553,25 @@ class DiscotecaApp(ctk.CTk):
         evento = EventoCRUD.obtener_por_id(self.db, evento_id)
         
         if evento:
+            # Limpiar campos
             self.evento_nombre.delete(0, "end")
             self.evento_descripcion.delete(0, "end")
             self.evento_precio.delete(0, "end")
             self.evento_aforo.delete(0, "end")
+            self.fecha_evento_entry.delete(0, "end")
             
+            # Llenar campos con datos del evento
             self.evento_nombre.insert(0, evento.nombre)
             self.evento_descripcion.insert(0, evento.descripcion or "")
             self.evento_precio.insert(0, str(evento.precio_entrada))
             self.evento_aforo.insert(0, str(evento.aforo_maximo))
             
-            fecha_hora = evento.fecha
-            self.cal.set_date(fecha_hora.date())
-            self.hora_spinbox.set(f"{fecha_hora.hour:02d}")
-            self.minuto_spinbox.set(f"{fecha_hora.minute:02d}")
+            # Formatear y mostrar fecha y hora
+            fecha_formateada = evento.fecha.strftime("%Y-%m-%d %H:%M")
+            self.fecha_evento_entry.insert(0, fecha_formateada)
+            
+            # Guardar la fecha_hora para edición
+            self.fecha_hora_seleccionada = evento.fecha
 
     def editar_evento(self):
         selected_item = self.evento_tree.selection()
@@ -401,37 +582,35 @@ class DiscotecaApp(ctk.CTk):
         try:
             evento_id = self.evento_tree.item(selected_item[0], "values")[0]
             
-            fecha = self.cal.get_date()
-            hora = int(self.hora_spinbox.get())
-            minuto = int(self.minuto_spinbox.get())
-            
-            fecha_hora = datetime(
-                year=fecha.year,
-                month=fecha.month,
-                day=fecha.day,
-                hour=hora,
-                minute=minuto
-            )
+            # Verificar que se haya seleccionado una fecha y hora
+            if not hasattr(self, 'fecha_hora_seleccionada') or not self.fecha_hora_seleccionada:
+                messagebox.showerror("Error", "Por favor seleccione una fecha y hora para el evento")
+                return
             
             nuevos_datos = {
                 "nombre": self.evento_nombre.get(),
                 "descripcion": self.evento_descripcion.get(),
-                "fecha": fecha_hora,
+                "fecha": self.fecha_hora_seleccionada,
                 "precio_entrada": float(self.evento_precio.get()),
                 "aforo_maximo": int(self.evento_aforo.get())
             }
             
-            if self.facade.editar_evento(evento_id, nuevos_datos):
+            if self.facade.actualizar_evento(evento_id, nuevos_datos):
                 messagebox.showinfo("Éxito", "Evento actualizado correctamente")
                 self.actualizar_lista_eventos()
+                
                 # Limpiar campos después de editar
                 self.evento_nombre.delete(0, "end")
                 self.evento_descripcion.delete(0, "end")
                 self.evento_precio.delete(0, "end")
                 self.evento_aforo.delete(0, "end")
+                self.fecha_evento_entry.delete(0, "end")
+                self.fecha_hora_seleccionada = None
             else:
                 messagebox.showerror("Error", "No se pudo actualizar el evento")
                 
+        except ValueError:
+            messagebox.showerror("Error", "Por favor ingrese valores numéricos válidos para precio y aforo")
         except Exception as e:
             messagebox.showerror("Error", f"Error al editar evento: {str(e)}")
 
@@ -502,21 +681,36 @@ class DiscotecaApp(ctk.CTk):
             border_width=1
         )
         self.cliente_nombre.grid(row=1, column=0, padx=10, sticky="ew")
-        
-        # Entry del RUT
+        # Entry del RUT (solo números)
         ctk.CTkLabel(
             form_frame, 
             text="RUT:", 
             font=("Arial", 14)
         ).grid(row=0, column=1, padx=10, pady=(10,0), sticky="w")
-        
+
         self.cliente_rut = ctk.CTkEntry(
             form_frame, 
             fg_color="#25253a", 
             border_color="#7209b7", 
+            border_width=1,
+            width=120
+        )
+        self.cliente_rut.grid(row=1, column=1, padx=(10,0), sticky="ew")
+
+        # Caja dígito verificador
+        ctk.CTkLabel(
+            form_frame,
+            text="-",
+            font=("Arial", 14)
+        ).grid(row=1, column=2, padx=(0, 0))
+        self.cliente_rut_dv = ctk.CTkEntry(
+            form_frame,
+            width=25,
+            fg_color="#25253a",
+            border_color="#7209b7",
             border_width=1
         )
-        self.cliente_rut.grid(row=1, column=1, padx=10, sticky="ew")
+        self.cliente_rut_dv.grid(row=1, column=3, padx=(0,10))
         
         # Entry del Email
         ctk.CTkLabel(
@@ -572,7 +766,20 @@ class DiscotecaApp(ctk.CTk):
             width=150
         ).pack(side="left", padx=5)
 
-        # Botón para eliminar cliente (nuevo)
+        # Botón para editar cliente
+        ctk.CTkButton(
+            button_frame,
+            text="🖊 Editar Cliente",
+            fg_color="#7209b7",
+            hover_color="#9d4dc7",
+            command=self.editar_cliente,
+            corner_radius=15,
+            font=("Arial", 14),
+            height=40,
+            width=150
+        ).pack(side="left", padx=5)
+        
+        # Botón para eliminar cliente 
         ctk.CTkButton(
             button_frame,
             text="🗑 Eliminar Cliente",
@@ -587,19 +794,117 @@ class DiscotecaApp(ctk.CTk):
 
         # Tabla de clientes
         self.cliente_tree = self.create_treeview(["ID", "Nombre", "RUT", "Email", "Teléfono"])
+        self.cliente_tree.bind("<<TreeviewSelect>>", self.on_cliente_select)
         self.actualizar_lista_clientes()
+    
+    def on_cliente_select(self, event):
+        selected_items = self.cliente_tree.selection()
+        if selected_items:
+            item = self.cliente_tree.item(selected_items[0])
+            values = item["values"]
+
+            self.cliente_nombre.delete(0, "end")
+            self.cliente_nombre.insert(0, values[1])
+
+            # SEPARA RUT Y DV DE FORMA ROBUSTA
+            self.cliente_rut.delete(0, "end")
+            self.cliente_rut_dv.delete(0, "end")
+            rut_db = values[2]
+            # Elimina puntos y espacios
+            rut_db = str(rut_db).replace(".", "").replace(" ", "")
+            if "-" in rut_db:
+                rut_num, dv = rut_db.split("-")
+            elif len(rut_db) > 1:
+                rut_num, dv = rut_db[:-1], rut_db[-1]
+            else:
+                rut_num, dv = "", ""
+            self.cliente_rut.insert(0, rut_num)
+            self.cliente_rut_dv.insert(0, dv)
+
+            self.cliente_email.delete(0, "end")
+            self.cliente_email.insert(0, values[3])
+
+            self.cliente_telefono.delete(0, "end")
+            self.cliente_telefono.insert(0, values[4])
 
     def registrar_cliente(self):
+        nombre = self.cliente_nombre.get()
+        rut_numero = self.cliente_rut.get().strip()
+        dv = self.cliente_rut_dv.get().strip().upper()
+        rut = f"{rut_numero}{dv}"
+        email = self.cliente_email.get()
+        telefono = self.cliente_telefono.get()
+
+        # --- VALIDACIONES ESTRUCTURALES ---
+        if not validar_rut(rut_numero, dv):
+            messagebox.showerror("Error", "El RUT ingresado no es válido. Debe tener formato chileno y dígito verificador correcto.")
+            return
+        if not validar_telefono(telefono):
+            messagebox.showerror("Error", "El teléfono debe tener 9 dígitos y comenzar con 9.")
+            return
+        if not validar_email(email):
+            messagebox.showerror("Error", "El email ingresado no es válido. Ejemplo: usuario@gmail.com")
+            return
+
+        cliente_data = {
+            "nombre": nombre,
+            "rut": rut,
+            "email": email,
+            "telefono": telefono
+        }
         try:
-            cliente_data = {
-                "nombre": self.cliente_nombre.get(),
-                "rut": self.cliente_rut.get(),
-                "email": self.cliente_email.get(),
-                "telefono": self.cliente_telefono.get()
-            }
             self.facade.registrar_cliente(cliente_data)
-            messagebox.showinfo("Éxito", "Cliente registrado")
+            messagebox.showinfo("Éxito", "Cliente registrado correctamente")
             self.actualizar_lista_clientes()
+            self.cliente_nombre.delete(0, "end")
+            self.cliente_rut.delete(0, "end")
+            self.cliente_rut_dv.delete(0, "end")
+            self.cliente_email.delete(0, "end")
+            self.cliente_telefono.delete(0, "end")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def editar_cliente(self):
+        selected_item = self.cliente_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Seleccione un cliente para editar")
+            return
+
+        nombre = self.cliente_nombre.get()
+        rut_numero = self.cliente_rut.get().strip()
+        dv = self.cliente_rut_dv.get().strip().upper()
+        rut = f"{rut_numero}{dv}"
+        email = self.cliente_email.get()
+        telefono = self.cliente_telefono.get()
+
+
+        # --- VALIDACIONES ESTRUCTURALES ---
+        if not validar_rut(rut_numero, dv):
+            messagebox.showerror("Error", "El RUT ingresado no es válido. Debe tener formato chileno y dígito verificador correcto.")
+            return
+        if not validar_telefono(telefono):
+            messagebox.showerror("Error", "El teléfono debe tener 9 dígitos y comenzar con 9.")
+            return
+        if not validar_email(email):
+            messagebox.showerror("Error", "El email ingresado no es válido. Ejemplo: usuario@gmail.com")
+            return
+
+        try:
+            cliente_id = self.cliente_tree.item(selected_item[0], "values")[0]
+            nuevos_datos = {
+                "nombre": nombre,
+                "rut": rut,
+                "email": email,
+                "telefono": telefono
+            }
+            self.facade.actualizar_cliente(cliente_id, nuevos_datos)
+            messagebox.showinfo("Éxito", "Cliente editado correctamente")
+            self.actualizar_lista_clientes()
+            self.cliente_nombre.delete(0, "end")
+            self.cliente_rut.delete(0, "end")
+            self.cliente_rut_dv.delete(0, "end")
+            self.cliente_email.delete(0, "end")
+            self.cliente_telefono.delete(0, "end")
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -631,9 +936,14 @@ class DiscotecaApp(ctk.CTk):
                 messagebox.showerror("Error", f"No se pudo eliminar el cliente: {str(e)}")
 
     def actualizar_lista_clientes(self):
-        self.cliente_tree.delete(*self.cliente_tree.get_children())
-        for c in self.facade.listar_clientes():
-            self.cliente_tree.insert("", "end", values=(c.id, c.nombre, c.rut, c.email or "", c.telefono or ""))
+        # Limpia el treeview
+        for item in self.cliente_tree.get_children():
+            self.cliente_tree.delete(item)
+        # Vuelve a cargar los clientes
+        for cliente in self.facade.listar_clientes():
+            self.cliente_tree.insert("", "end", values=(
+                cliente.id, cliente.nombre, cliente.rut, cliente.email, cliente.telefono
+            ))
 
     def create_treeview(self, columns):
         tree = ttk.Treeview(self.main_frame, columns=columns, show="headings")
@@ -674,6 +984,103 @@ class DiscotecaApp(ctk.CTk):
             # Pestaña de Pedidos
             self.setup_tragos_pedidos_tab(tabview.tab("Pedidos"))
 
+    def setup_tragos_pedidos_tab(self, tab):
+        # --- Frame de cliente y búsqueda ---
+        cliente_frame = ctk.CTkFrame(tab, fg_color="#23233a", corner_radius=15)
+        cliente_frame.pack(fill="x", padx=20, pady=(20, 5))
+
+        ctk.CTkLabel(cliente_frame, text="Cliente:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+        self.busqueda_cliente = ctk.CTkEntry(cliente_frame, width=160, fg_color="#25253a", border_color="#7209b7", border_width=1)
+        self.busqueda_cliente.grid(row=0, column=1, padx=(0,10), pady=10)
+        self.busqueda_cliente.bind("<KeyRelease>", self.filtrar_clientes)
+
+        self.lista_clientes = ctk.CTkComboBox(cliente_frame, border_color="#7209b7", fg_color="#25253a", state="readonly", width=220)
+        self.lista_clientes.grid(row=0, column=2, padx=10, pady=10)
+        self.actualizar_lista_clientes_combo()
+        self.lista_clientes.bind("<<ComboboxSelected>>", self.on_cliente_seleccionado)
+
+        self.cliente_seleccionado_label = ctk.CTkLabel(cliente_frame, text="Seleccione un cliente.", font=("Arial", 12))
+        self.cliente_seleccionado_label.grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 5), sticky="w")
+
+        # --- Frame de selección de trago y cantidad ---
+        trago_frame = ctk.CTkFrame(tab, fg_color="#23233a", corner_radius=15)
+        trago_frame.pack(fill="x", padx=20, pady=(5, 5))
+
+        ctk.CTkLabel(trago_frame, text="Trago:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+        self.busqueda_trago = ctk.CTkEntry(trago_frame, width=160, fg_color="#25253a", border_color="#7209b7", border_width=1)
+        self.busqueda_trago.grid(row=0, column=1, padx=(0,10), pady=10)
+        self.busqueda_trago.bind("<KeyRelease>", self.filtrar_tragos)
+
+        self.lista_tragos = ctk.CTkComboBox(trago_frame, border_color="#7209b7", fg_color="#25253a", state="readonly", width=220)
+        self.lista_tragos.grid(row=0, column=2, padx=10, pady=10)
+        self.actualizar_lista_tragos_combo()
+
+        ctk.CTkLabel(trago_frame, text="Cantidad:", font=("Arial", 14)).grid(row=0, column=3, padx=(10,2), pady=10, sticky="w")
+        self.trago_cantidad = ctk.CTkEntry(trago_frame, width=50, fg_color="#25253a", border_color="#7209b7", border_width=1)
+        self.trago_cantidad.grid(row=0, column=4, padx=(2,10), pady=10)
+        self.trago_cantidad.insert(0, "1")
+
+        ctk.CTkButton(trago_frame, text="➕ Agregar", fg_color="#7209b7", hover_color="#9d4dc7",
+                    command=self.agregar_trago_pedido, font=("Arial", 13), width=100, height=35).grid(row=0, column=5, padx=(10,0), pady=10)
+
+        # --- Tabla de pedido ---
+        pedido_frame = ctk.CTkFrame(tab, fg_color="#23233a", corner_radius=15)
+        pedido_frame.pack(fill="both", expand=True, padx=20, pady=(5, 5))
+
+        columns = ("Trago", "Cantidad", "Precio Unitario", "Subtotal", "Eliminar")
+        self.pedido_tree = ttk.Treeview(pedido_frame, columns=columns, show="headings", height=8)
+        self.pedido_tree.bind("<Double-1>", self.on_pedido_tree_double_click)
+        for col in columns:
+            self.pedido_tree.heading(col, text=col)
+            self.pedido_tree.column(col, anchor="center", width=120)
+        self.pedido_tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # --- Total y Confirmar ---
+        total_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        total_frame.pack(fill="x", padx=20, pady=(5, 15))
+
+        self.pedido_total = ctk.CTkLabel(total_frame, text="Total: $0.00", font=("Arial", 16, "bold"), text_color="#7209b7")
+        self.pedido_total.pack(side="left", padx=(10,20), pady=10)
+        
+        ctk.CTkButton(
+            pedido_frame,
+            text="🗑 Eliminar Trago Seleccionado",
+            fg_color="#7209b7",
+            hover_color="#9d4dc7",
+            font=("Arial", 13),
+            width=200,
+            height=35,
+            command=self.eliminar_trago_seleccionado_pedido
+        ).pack(pady=(0, 10), padx=10, anchor="e")
+
+        ctk.CTkButton(total_frame, text="✅ Confirmar Pedido", fg_color="#7209b7", hover_color="#9d4dc7",
+                    command=self.confirmar_pedido_tragos, font=("Arial", 15), width=180, height=40).pack(side="right", padx=10, pady=10)
+
+        # --- Limpieza de pedido al cambiar de pestaña ---
+        self.limpiar_pedido()
+    def eliminar_trago_seleccionado_pedido(self):
+        selected = self.pedido_tree.selection()
+        if not selected:
+            messagebox.showwarning("Advertencia", "Seleccione una fila para eliminar")
+            return
+        for item in selected:
+            self.pedido_tree.delete(item)
+        self.actualizar_total_pedido()
+
+    def on_pedido_tree_double_click(self, event):
+        # Detecta la columna y el item
+        region = self.pedido_tree.identify("region", event.x, event.y)
+        if region == "cell":
+            col = self.pedido_tree.identify_column(event.x)
+            # Suponiendo que "Eliminar" es la última columna (por ejemplo, "#5" si tienes 5 columnas)
+            if col == f"#{len(self.pedido_tree['columns'])}":
+                row_id = self.pedido_tree.identify_row(event.y)
+                if row_id:
+                    self.pedido_tree.delete(row_id)
+                    self.actualizar_total_pedido()
+
     def setup_tragos_registro_tab(self, tab):
         form_frame = ctk.CTkFrame(tab, fg_color="#1e1e2d", corner_radius=15)
         form_frame.pack(fill="x", padx=10, pady=10)
@@ -711,22 +1118,10 @@ class DiscotecaApp(ctk.CTk):
         )
         self.trago_precio.grid(row=1, column=1, padx=10, pady=(5,10), sticky="ew")
 
-        # Checkbox para disponibilidad
-        self.trago_disponible = ctk.CTkCheckBox(
-        form_frame, 
-        text="Disponible", 
-        fg_color="#7209b7", 
-        hover_color="#9d4dc7"
-        )
-        self.trago_disponible.grid(
-            row=4, 
-            column=0, 
-            columnspan=2, 
-            padx=10, 
-            pady=10, 
-            sticky="w"
-        )
-
+        # --- ELIMINADO: Checkbox para disponibilidad ---
+        # self.trago_disponible = ctk.CTkCheckBox(...)
+        # self.trago_disponible.grid(...)
+        
         # Botones
         btn_frame = ctk.CTkFrame(tab, fg_color="#1e1e2d")
         btn_frame.pack(fill="x", padx=10, pady=10)
@@ -743,17 +1138,18 @@ class DiscotecaApp(ctk.CTk):
             width=150
         ).pack(side="left", padx=5)
 
-        ctk.CTkButton(
-            btn_frame, 
-            text="↔ Cambiar Disponibilidad",
-            command=self.cambiar_disponibilidad_trago,
-            fg_color="#7209b7",
-            hover_color="#9d4dc7",
-            corner_radius=15,
-            font=("Arial", 14),
-            height=40,
-            width=150
-        ).pack(side="left", padx=10)
+        # --- ELIMINADO: Botón de cambiar disponibilidad ---
+        # ctk.CTkButton(
+        #     btn_frame, 
+        #     text="↔ Cambiar Disponibilidad",
+        #     command=self.cambiar_disponibilidad_trago,
+        #     fg_color="#7209b7",
+        #     hover_color="#9d4dc7",
+        #     corner_radius=15,
+        #     font=("Arial", 14),
+        #     height=40,
+        #     width=150
+        # ).pack(side="left", padx=10)
 
         ctk.CTkButton(
         btn_frame, 
@@ -794,11 +1190,14 @@ class DiscotecaApp(ctk.CTk):
         self.actualizar_lista_tragos()
         self.trago_tree.pack(fill="both", expand=True, padx=20, pady=10)
 
+        # Vincular evento para seleccionar trago desde el treeview
+        self.trago_tree.bind("<<TreeviewSelect>>", self.on_trago_tree_select)
+
         ctk.CTkLabel(
         form_frame, 
         text="Stock:",
         font=("Arial", 14)
-    ).grid(row=5, column=0, padx=10, pady=(5,0), sticky="w")
+        ).grid(row=5, column=0, padx=10, pady=(5,0), sticky="w")
     
         self.trago_stock = ctk.CTkEntry(
             form_frame, 
@@ -818,7 +1217,18 @@ class DiscotecaApp(ctk.CTk):
                 self.trago_precio.insert(0, str(trago.precio))
                 self.trago_stock.delete(0, "end")
                 self.trago_stock.insert(0, str(trago.stock))
-                self.trago_disponible.select() if trago.disponible else self.trago_disponible.deselect()
+                # --- ELIMINADO: Disponibilidad manual ---
+                # self.trago_disponible.select() if trago.disponible else self.trago_disponible.deselect()
+
+    def on_trago_tree_select(self, event):
+        selected = self.trago_tree.selection()
+        if selected:
+            values = self.trago_tree.item(selected[0])["values"]
+            trago_nombre = values[1]
+            combobox_val = next((v for v in self.trago_seleccionado.cget("values") if v.startswith(trago_nombre)), None)
+            if combobox_val:
+                self.trago_seleccionado.set(combobox_val)
+                self.on_trago_selected(None)
 
     def actualizar_stock_trago(self):
         try:
@@ -829,16 +1239,19 @@ class DiscotecaApp(ctk.CTk):
                 messagebox.showwarning("Advertencia", "Seleccione un trago primero")
                 return
 
+            # Validación: Stock no negativo
+            if nuevo_stock < 0:
+                messagebox.showerror("Error", "El stock no puede ser negativo.")
+                return
+
             trago_nombre = trago_str.split(" ($")[0]
             trago = self.facade.obtener_trago_por_nombre(trago_nombre)
 
             if trago:
-                # Usar el método CRUD que devuelve el trago actualizado
                 trago_actualizado = self.facade.actualizar_stock_trago(trago.id, nuevo_stock)
                 if trago_actualizado:
-                    estado = "disponible" if trago_actualizado.disponible else "no disponible"
+                    estado = "disponible" if trago_actualizado.stock > 0 else "no disponible"
                     messagebox.showinfo("Éxito", f"Stock actualizado a {nuevo_stock}, trago ahora {estado}")
-                    # Actualizar las vistas (tablas y combos)
                     self.actualizar_lista_tragos()
                     self.actualizar_lista_tragos_combobox()
                     self.actualizar_lista_tragos_combo()
@@ -849,192 +1262,6 @@ class DiscotecaApp(ctk.CTk):
         except ValueError:
             messagebox.showerror("Error", "Ingrese un valor numérico válido para el stock")
 
-
-    def setup_tragos_pedidos_tab(self, tab):
-        # Frame de instrucciones
-        instrucciones_frame = ctk.CTkFrame(tab, fg_color="transparent")
-        instrucciones_frame.pack(fill="x", padx=10, pady=(5, 10))
-        
-        ctk.CTkLabel(
-            instrucciones_frame, 
-            text="① Seleccione cliente → ② Añada tragos → ③ Confirme pedido",
-            font=("Arial", 13, "bold"),
-            text_color="#7209b7"
-        ).pack()
-
-        # Frame superior para selección de cliente con búsqueda
-        cliente_frame = ctk.CTkFrame(tab, fg_color="#1e1e2d", corner_radius=15)
-        cliente_frame.pack(fill="x", padx=10, pady=(0, 10))
-
-        # Búsqueda de cliente
-        ctk.CTkLabel(
-            cliente_frame, 
-            text="Buscar Cliente:",
-            font=("Arial", 14)
-        ).grid(row=0, column=0, padx=5, pady=5)
-        self.busqueda_cliente = ctk.CTkEntry(
-            cliente_frame,
-            fg_color="#25253a",  # Fondo interno del cuadro
-            border_color="#7209b7",  # Color del borde
-            border_width=1  # Ancho del borde
-        )
-        self.busqueda_cliente.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        self.busqueda_cliente.bind("<KeyRelease>", self.filtrar_clientes)
-
-        # Combobox de clientes filtrados
-        self.lista_clientes = ctk.CTkComboBox(
-            cliente_frame, 
-            border_color="#7209b7", 
-            fg_color="#25253a",
-            state="readonly",
-            border_width=1
-        )
-        self.lista_clientes.grid(row=0, column=2, columnspan=2, padx=5, pady=5, sticky="ew")
-        self.actualizar_lista_clientes_combo()
-
-        # Panel de info del cliente seleccionado
-        self.cliente_info_frame = ctk.CTkFrame(tab, fg_color="#25253e", corner_radius=15)
-        self.cliente_info_frame.pack(fill="x", padx=10, pady=(0, 15))
-        self.cliente_seleccionado_label = ctk.CTkLabel(
-            self.cliente_info_frame, 
-            text="Ningún cliente seleccionado",
-            font=("Arial", 12)
-        )
-        self.cliente_seleccionado_label.pack(pady=5)
-
-        # Frame para agregar tragos
-        tragos_frame = ctk.CTkFrame(tab, fg_color="#1e1e2d", corner_radius=15)
-        tragos_frame.pack(fill="x", padx=10, pady=10)
-
-        # Búsqueda de tragos
-        ctk.CTkLabel(
-            tragos_frame, 
-            text="Buscar Trago:",
-            font=("Arial", 14)
-        ).grid(row=0, column=0, padx=5, pady=5)
-        self.busqueda_trago = ctk.CTkEntry(
-            tragos_frame,
-            fg_color="#25253a",  # Fondo interno del cuadro
-            border_color="#7209b7",  # Color del borde
-            border_width=1  # Ancho del borde
-        )
-        self.busqueda_trago.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        self.busqueda_trago.bind("<KeyRelease>", self.filtrar_tragos)
-
-        # Combobox de tragos filtrados
-        self.lista_tragos = ctk.CTkComboBox(
-            tragos_frame, 
-            border_color="#7209b7",
-            fg_color="#25253a",  # Fondo interno del cuadro
-            state="readonly",
-            border_width=1
-        )
-        self.lista_tragos.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
-        self.actualizar_lista_tragos_combo()
-
-        # Cantidad
-        ctk.CTkLabel(
-            tragos_frame, 
-            text="Cantidad:",
-            font=("Arial", 14)
-        ).grid(row=1, column=0, padx=5, pady=5)
-        self.trago_cantidad = ctk.CTkEntry(
-            tragos_frame, 
-            width=140,
-            border_color="#7209b7",  # Color del borde
-            border_width=1,
-            fg_color="#25253a"
-        )
-        self.trago_cantidad.grid(row=1, column=1, padx=5, pady=5)
-        self.trago_cantidad.insert(0, "1")
-
-        # Botón para agregar
-        agregar_btn = ctk.CTkButton(
-            tragos_frame, 
-            text="➕ Agregar",
-            command=self.agregar_trago_pedido,
-            width=80,
-            fg_color="#2e8b57",
-            hover_color="#3cb371"
-        )
-        agregar_btn.grid(row=1, column=2, padx=5, pady=5)
-
-        # Lista de pedidos actuales
-        columns = ["Trago", "Cantidad", "Precio Unitario", "Subtotal", "✖"]
-        self.pedido_tree = ttk.Treeview(
-            tab,
-            columns=columns,
-            show="headings",
-            height=8,
-            selectmode="browse"
-        )
-        
-        # Configurar columnas
-        col_widths = [150, 60, 120, 100, 30]
-        for col, width in zip(columns, col_widths):
-            self.pedido_tree.heading(col, text=col)
-            self.pedido_tree.column(col, width=width, anchor="center")
-        
-        # Estilo para el Treeview
-        style = ttk.Style()
-        style.theme_use("default")
-        style.configure("Treeview", 
-            background="#25253a",          # Color de fondo para las filas
-            foreground="white",           # Color del texto
-            fieldbackground="#25253a",    # Color de fondo para el área de datos
-            bordercolor="#3b3b3b",
-            borderwidth=0
-        )
-        # Color para la cabecera (nombres de columnas)
-        style.configure("Treeview.Heading",
-            background="#1e1e2d",         # Color de fondo de la cabecera
-            foreground="white",           # Color del texto de la cabecera
-            borderwidth=1
-        )
-        # Color cuando se selecciona una fila
-        style.map('Treeview', 
-            background=[('selected', '#7209b7')],     # Color morado cuando se selecciona
-            foreground=[('selected', 'white')]        # Color del texto cuando se selecciona
-        )
-        
-        self.pedido_tree.pack(fill="both", expand=True, padx=20, pady=(0, 15))
-
-        # Frame inferior con total y botón
-        bottom_frame = ctk.CTkFrame(tab, fg_color="transparent")
-        bottom_frame.pack(fill="x", padx=20, pady=(0, 10))
-
-        self.pedido_total = ctk.CTkLabel(
-            bottom_frame, 
-            text="Total: $0.00", 
-            font=("Arial", 14, "bold"),
-            text_color="#f0f0f0"
-        )
-        self.pedido_total.pack(side="left", padx=10)
-
-        confirmar_btn = ctk.CTkButton(
-            bottom_frame,
-            text="✅ Confirmar Pedido",
-            command=self.confirmar_pedido_tragos,
-            fg_color="#7209b7",
-            hover_color="#9d4dc7"
-        )
-        confirmar_btn.pack(side="right")
-
-    def registrar_trago(self):
-        try:
-            trago_data = {
-                "nombre": self.trago_nombre.get(),
-                "descripcion": self.trago_descripcion.get(),
-                "precio": float(self.trago_precio.get()),
-                "categoria": self.trago_categoria.get() or None
-            }
-            
-            TragoCRUD.crear_trago(self.db, **trago_data)
-            messagebox.showinfo("Éxito", "Trago registrado correctamente")
-            self.actualizar_lista_tragos()
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
     def actualizar_lista_tragos(self):
         for item in self.trago_tree.get_children():
             self.trago_tree.delete(item)
@@ -1042,7 +1269,8 @@ class DiscotecaApp(ctk.CTk):
         # Obtener todos los tragos y mostrarlos correctamente
         tragos = self.facade.listar_tragos()
         for trago in tragos:
-            disponible = "Sí" if trago.disponible else "No"
+            # DISPONIBILIDAD SOLO POR STOCK
+            disponible = "Sí" if trago.stock > 0 else "No"
             self.trago_tree.insert("", "end", values=(
                 trago.id,
                 trago.nombre,
@@ -1051,6 +1279,9 @@ class DiscotecaApp(ctk.CTk):
                 disponible,
                 trago.stock  # Mostrar el stock
             ))
+
+    # --- ELIMINADO: cambiar_disponibilidad_trago y referencias a self.trago_disponible ---
+
 
     def obtener_tragos_combobox(self):
         tragos = self.facade.listar_tragos()
@@ -1182,7 +1413,12 @@ class DiscotecaApp(ctk.CTk):
             if not trago_str:
                 messagebox.showwarning("Advertencia", "Seleccione un trago primero")
                 return
-                
+
+            # --- VALIDACIÓN: Precio no negativo ---
+            if nuevo_precio < 0:
+                messagebox.showerror("Error", "El precio no puede ser negativo.")
+                return
+
             trago_nombre = trago_str.split(" ($")[0]
             trago = self.facade.obtener_trago_por_nombre(trago_nombre)
             

@@ -1,6 +1,7 @@
 from crud.huesped_crud import HuespedCRUD
 from crud.habitacion_crud import HabitacionCRUD
 from crud.reserva_crud import ReservaCRUD
+from models_folder.models_hotel import Reserva, Habitacion, Huesped
 
 class HotelFacade:
     def __init__(self, db_session):
@@ -46,10 +47,60 @@ class HotelFacade:
         return ReservaCRUD.obtener_todas_reservas(self.db)
 
     def eliminar_reserva(self, reserva_id):
-        return ReservaCRUD.eliminar_reserva(self.db, reserva_id)
+        reserva = self.db.query(Reserva).get(reserva_id)
+        if not reserva:
+            raise ValueError("La reserva no existe")
+        # Marca la habitación como disponible
+        habitacion = self.db.query(Habitacion).get(reserva.habitacion_id)
+        if habitacion:
+            habitacion.disponible = True
+        self.db.delete(reserva)
+        self.db.commit()
+        return True
 
     def actualizar_reserva(self, reserva_id, **kwargs):
-        return ReservaCRUD.actualizar_reserva(self.db, reserva_id, **kwargs)
+        # Obtener la reserva actual
+        reserva_actual = self.db.query(Reserva).filter(Reserva.id == reserva_id).first()
+        if not reserva_actual:
+            raise ValueError("Reserva no encontrada")
+
+        campos_a_actualizar = {}
+
+        # Solo agregar los campos que realmente cambiaron
+        nuevo_huesped_id = kwargs.get("huesped_id")
+        if nuevo_huesped_id is not None and nuevo_huesped_id != reserva_actual.huesped_id:
+            campos_a_actualizar["huesped_id"] = nuevo_huesped_id
+
+        nueva_habitacion_id = kwargs.get("habitacion_id")
+        if nueva_habitacion_id is not None and nueva_habitacion_id != reserva_actual.habitacion_id:
+            campos_a_actualizar["habitacion_id"] = nueva_habitacion_id
+
+        nueva_fecha_entrada = kwargs.get("fecha_entrada")
+        if nueva_fecha_entrada is not None and nueva_fecha_entrada != reserva_actual.fecha_entrada:
+            campos_a_actualizar["fecha_entrada"] = nueva_fecha_entrada
+
+        nueva_fecha_salida = kwargs.get("fecha_salida")
+        if nueva_fecha_salida is not None and nueva_fecha_salida != reserva_actual.fecha_salida:
+            campos_a_actualizar["fecha_salida"] = nueva_fecha_salida
+
+        nuevo_tipo_precio = kwargs.get("tipo_precio")
+        if nuevo_tipo_precio is not None and nuevo_tipo_precio != getattr(reserva_actual, "tipo_precio", None):
+            campos_a_actualizar["tipo_precio"] = nuevo_tipo_precio
+
+        nuevo_precio = kwargs.get("precio")
+        if nuevo_precio is not None and nuevo_precio != reserva_actual.precio:
+            campos_a_actualizar["precio"] = nuevo_precio
+
+        nuevo_precio_final = kwargs.get("precio_final")
+        if nuevo_precio_final is not None and nuevo_precio_final != reserva_actual.precio_final:
+            campos_a_actualizar["precio_final"] = nuevo_precio_final
+
+        if not campos_a_actualizar:
+            # Nada que actualizar
+            return reserva_actual
+
+        from crud.reserva_crud import ReservaCRUD
+        return ReservaCRUD.actualizar_reserva(self.db, reserva_id, **campos_a_actualizar)
     
     def guardar_reserva(self, reserva_obj):
         """Guarda un objeto Reserva ya construido"""
