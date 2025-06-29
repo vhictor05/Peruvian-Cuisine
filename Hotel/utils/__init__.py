@@ -1,0 +1,1 @@
+from .validadores import validar_telefono, validar_email, validar_rut, validar_texto, validar_numero, validar_precio
