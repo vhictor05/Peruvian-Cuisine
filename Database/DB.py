@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # Una sola base de datos principal
-SQLALCHEMY_DATABASE_URL = "sqlite:///./main.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:////.main.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 
 # Declarar base común

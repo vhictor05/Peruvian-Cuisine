@@ -167,7 +167,7 @@ class ModuleLauncherApp(ctk.CTk):
         
     def launch_module(self, module_file):
         # Ruta relativa a la subcarpeta ProyectoNuevo
-        module_path = os.path.join("ProyectoNuevo", module_file)
+        module_path = os.path.join(".", module_file)
         
         if not os.path.exists(module_path):
             messagebox.showerror("Error", 
