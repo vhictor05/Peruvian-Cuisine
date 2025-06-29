@@ -1,9 +1,9 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime
-from Database.DB import ReportBase  # Cambiado de database a report_database
+from Database.DB import Base  # Cambiamos ReportBase por Base
 from datetime import datetime
 
-class ReporteError(ReportBase):  # Usar ReportBase en lugar de Base
-    __tablename__ = "reportes_errores"  # Asegúrate que coincida con tu BD
+class ReporteError(Base):  # Cambiamos ReportBase por Base
+    __tablename__ = "reportes_errores"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     titulo = Column(String(100), nullable=False)
