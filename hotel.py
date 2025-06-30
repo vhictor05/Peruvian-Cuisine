@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from Database.DB import get_db, Base, engine
-from Hotel.interfaz import HotelApp
+from apps.Hotel.interfaz import HotelApp
 
 # Configurar tema oscuro
 ctk.set_appearance_mode("dark")

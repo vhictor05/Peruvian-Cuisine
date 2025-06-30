@@ -1,10 +1,10 @@
 from Database.DB import get_db, engine, Base
-from Restaurante.vistas.menu_vista import MenuPanel
-from Restaurante.vistas.pedido_vista import PanelPedido
-from Restaurante.vistas.compra_vista import PanelCompra
-from Restaurante.vistas.cliente_vista import ClientePanel
-from Restaurante.vistas.ingrediente_vista import IngredientePanel
-from observer.restaurant_observer import ObserverManager
+from apps.Restaurante.vistas.menu_vista import MenuPanel
+from apps.Restaurante.vistas.pedido_vista import PanelPedido
+from apps.Restaurante.vistas.compra_vista import PanelCompra
+from apps.Restaurante.vistas.cliente_vista import ClientePanel
+from apps.Restaurante.vistas.ingrediente_vista import IngredientePanel
+from estructura.observer.restaurant_observer import ObserverManager
 import customtkinter as ctk
 
 # Configuración global de estilos

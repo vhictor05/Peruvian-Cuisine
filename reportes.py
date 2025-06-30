@@ -1,6 +1,6 @@
 # Este archivo se encarga de iniciar la aplicacion de reportes
 
-from Reportes.interfaz import ReportesApp
+from apps.Reportes.interfaz import ReportesApp
 
 if __name__ == "__main__":
     app = ReportesApp()
