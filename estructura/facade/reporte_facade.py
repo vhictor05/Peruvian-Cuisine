@@ -1,14 +1,17 @@
-from apps.Reportes.infraestructura import SQLAlchemyReporteRepository
-from apps.Reportes.aplicacion import ReporteService
-from Database.DB import get_report_db, init_report_db
+from Database.DB import get_db, init_report_db
+from estructura.models_folder.models_reporte import ReporteError
+from estructura.crud.reporte_crud import SQLAlchemyReporteRepository
+from estructura.services.reporte_service import ReporteService
 
 class ReporteFacade:
     def __init__(self):
         init_report_db()
-        db_session = next(get_report_db())
+        db_session = next(get_db())  # Cambiado de get_report_db a get_db
         repository = SQLAlchemyReporteRepository(db_session)
         self.service = ReporteService(repository)
         self.usuarios_disponibles = ["Admin", "Manager", "Recepcionista", "Cocina", "Limpieza", "Seguridad", "Otro"]
+
+    # ... resto del código igual ...
 
     def obtener_usuarios(self) -> list:
         return self.usuarios_disponibles

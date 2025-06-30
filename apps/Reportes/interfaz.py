@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from estructura.facade.reporte_facade import ReporteFacade
-from Reportes.dominio import Reporte
+from apps.Reportes.dominio import Reporte
 
 class ReportesApp(ctk.CTk):
     def __init__(self):

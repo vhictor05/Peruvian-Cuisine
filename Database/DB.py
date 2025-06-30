@@ -6,11 +6,10 @@ from sqlalchemy.orm import sessionmaker
 SQLALCHEMY_DATABASE_URL = "sqlite:///./main.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 
-# Bases declarativas
+# Base declarativa única
 Base = declarative_base()
-ReportBase = declarative_base()  # Base para los reportes
 
-# Sesiones
+# Sesión única
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
@@ -19,3 +18,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# Alias para mantener compatibilidad con el código existente
+get_report_db = get_db
+init_report_db = lambda: Base.metadata.create_all(bind=engine)
