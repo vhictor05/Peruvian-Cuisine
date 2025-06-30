@@ -221,6 +221,7 @@ class ReportesApp(ctk.CTk):
 
     def enviar_reporte(self):
         try:
+            # Construir el reporte usando el builder pattern
             builder = (Reporte.builder()
                 .con_titulo(self.reporte_titulo.get())
                 .en_modulo(self.reporte_modulo.get())
@@ -228,12 +229,16 @@ class ReportesApp(ctk.CTk):
                 .con_descripcion(self.reporte_descripcion.get("1.0", "end-1c"))
                 .reportado_por(self.reporte_usuario.get()))
 
+            # ✅ CORRECIÓN: Llamar a build() primero para obtener el objeto Reporte
+            reporte = builder.build()
+            
+            # ✅ CORRECIÓN: Acceder a las propiedades del objeto reporte, no del builder
             datos = {
-                'titulo': builder.titulo,
-                'modulo': builder.modulo,
-                'urgencia': builder.urgencia,
-                'descripcion': builder.descripcion,
-                'usuario': builder.usuario_reporte
+                'titulo': reporte.titulo,
+                'modulo': reporte.modulo,
+                'urgencia': reporte.urgencia,
+                'descripcion': reporte.descripcion,
+                'usuario': reporte.reportado_por  # ✅ CORRECIÓN: usar reportado_por
             }
 
             success, msg = self.facade.crear_reporte(datos)
