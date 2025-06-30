@@ -6,7 +6,7 @@ from apps.Restaurante.vistas.cliente_vista import ClientePanel
 from apps.Restaurante.vistas.ingrediente_vista import IngredientePanel
 from estructura.observer.restaurant_observer import ObserverManager
 import customtkinter as ctk
-
+from utils.report_button import create_report_button
 # Configuración global de estilos
 ctk.set_appearance_mode("dark")
 
@@ -35,6 +35,9 @@ class MainApp(ctk.CTk):
     def create_menu(self):
         self.menu_frame = ctk.CTkFrame(self, fg_color="#25253a", width=200)
         self.menu_frame.grid(row=0, column=0, sticky="nsw", padx=20, pady=20)
+
+        self.report_button = create_report_button(self.menu_frame, self, "restaurant")
+        self.report_button.grid(row=0, column=0, pady=(10,30), padx=10)
         
         self.create_menu_button("   Menu", "MenuPanel", 3)
         self.create_menu_button("   Panel de compra", "PanelCompra", 4)

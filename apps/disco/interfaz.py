@@ -4,6 +4,7 @@ from apps.disco.clientes.clientes_vista import ClientesVista
 from apps.disco.tragos.tragos_vista import TragosVista
 from Database.DB import get_db
 from estructura.facade.discofacade import DiscotecaFacade
+from utils.report_button import create_report_button
 
 class DiscotecaApp(ctk.CTk):
     def __init__(self):
@@ -63,6 +64,10 @@ class DiscotecaApp(ctk.CTk):
             corner_radius=15
         )
         self.menu_frame.grid(row=1, column=0, sticky="ns", padx=20, pady=20)
+
+        # Agregar botón de reporte al principio del menú
+        self.report_button = create_report_button(self.menu_frame, self)
+        self.report_button.pack(side="top", pady=(10,20), padx=(20,0))
         
         self.create_menu_button("Eventos", self.show_eventos)
         self.create_menu_button("Clientes", self.show_clientes)

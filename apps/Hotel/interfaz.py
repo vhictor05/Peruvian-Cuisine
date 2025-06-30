@@ -6,7 +6,7 @@ from apps.Hotel.habitaciones.habitaciones_vista import HabitacionesVista
 from apps.Hotel.reservas.reservas_vista import ReservasVista
 from Database.DB import get_db
 from estructura.facade.hotelfacade import HotelFacade
-
+from utils.report_button import create_report_button
 class HotelApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -84,7 +84,11 @@ class HotelApp(ctk.CTk):
         )
         self.menu_frame.grid(row=1, column=0, sticky="nsw", padx=30, pady=(0, 30))
         self.menu_frame.grid_propagate(False)
-        
+
+            # Agregar el botón de reporte al principio
+        self.report_button = create_report_button(self.menu_frame, self)
+        self.report_button.pack(side="top", pady=(15,5))
+            
         self.create_menu_button("    Huéspedes", self.show_huespedes)
         self.create_menu_button("    Habitaciones", self.show_habitaciones)
         self.create_menu_button("    Reservas", self.show_reservas)
