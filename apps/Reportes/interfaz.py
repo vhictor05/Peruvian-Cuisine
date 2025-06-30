@@ -1,4 +1,4 @@
-import customtkinter as ctk
+﻿import customtkinter as ctk
 from tkinter import messagebox
 from estructura.facade.reporte_facade import ReporteFacade
 from apps.Reportes.dominio import Reporte

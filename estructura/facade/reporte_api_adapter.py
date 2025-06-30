@@ -1,7 +1,7 @@
 import requests
 from datetime import datetime
 
-class ReporteFacade:
+class ReporteAPIAdapter:
     def __init__(self):
         self.API_URL = "http://localhost:8000/api/v1"
         
@@ -39,7 +39,8 @@ class ReporteFacade:
             
             if response.status_code == 200:
                 reportes_api = response.json()
-                return [self._convertir_a_reporte(r) for r in reportes_api]
+                # Convertir el formato de la API al formato esperado por la interfaz
+                return [self._convertir_reporte_api(r) for r in reportes_api]
             else:
                 raise Exception(f"Error al obtener reportes: {response.json().get('detail', 'Error desconocido')}")
                 
@@ -87,20 +88,9 @@ class ReporteFacade:
                 
         except requests.RequestException as e:
             return False, f"Error de conexión: {str(e)}"
-
-    def obtener_usuarios(self):
-        # Por ahora retornamos una lista estática de usuarios
-        return ["admin", "usuario1", "usuario2"]
-        
-    def get_opciones_filtro(self):
-        return {
-            'modulo': ["Todos", "Restaurante", "Discoteca", "Hotel", "General"],
-            'urgencia': ["Todos", "Baja", "Media", "Alta", "Crítica"],
-            'estado': ["Todos", "Abierto", "En progreso", "Resuelto"],
-            'usuario': ["Todos", "admin", "usuario1", "usuario2"]
-        }
-        
+    
     def _convertir_urgencia(self, urgencia):
+        # Convertir urgencia de la interfaz al formato de la API
         mapping = {
             "Baja": "low",
             "Media": "medium",
@@ -110,28 +100,34 @@ class ReporteFacade:
         return mapping.get(urgencia, "medium")
         
     def _convertir_estado(self, estado):
+        # Convertir estado de la interfaz al formato de la API
         mapping = {
             "Abierto": "pending",
             "En progreso": "in_progress",
             "Resuelto": "resolved"
         }
         return mapping.get(estado, "pending")
-
-    def _convertir_a_reporte(self, datos_api):
-        from apps.Reportes.dominio import Reporte
         
-        return (Reporte.builder()
-            .con_id(datos_api['id'])
-            .con_titulo(datos_api['title'])
-            .con_descripcion(datos_api['description'])
-            .en_modulo(datos_api['module'].capitalize())
-            .con_urgencia(self._convertir_urgencia_inverso(datos_api['severity']))
-            .con_estado(self._convertir_estado_inverso(datos_api['status']))
-            .reportado_por(datos_api['reported_by'])
-            .con_fecha(datetime.fromisoformat(datos_api['created_at']))
-            .build())
-
+    def _convertir_reporte_api(self, reporte_api):
+        # Crear una clase que simule el objeto Reporte que espera tu interfaz
+        class ReporteDTO:
+            def __init__(self, **kwargs):
+                for key, value in kwargs.items():
+                    setattr(self, key, value)
+                    
+        return ReporteDTO(
+            id=reporte_api['id'],
+            titulo=reporte_api['title'],
+            descripcion=reporte_api['description'],
+            modulo=reporte_api['module'].capitalize(),
+            urgencia=self._convertir_urgencia_inverso(reporte_api['severity']),
+            estado=self._convertir_estado_inverso(reporte_api['status']),
+            fecha_reporte=datetime.fromisoformat(reporte_api['created_at']),
+            reportado_por=reporte_api['reported_by']
+        )
+        
     def _convertir_urgencia_inverso(self, urgencia_api):
+        # Convertir urgencia de la API al formato de la interfaz
         mapping = {
             "low": "Baja",
             "medium": "Media",
@@ -141,6 +137,7 @@ class ReporteFacade:
         return mapping.get(urgencia_api, "Media")
         
     def _convertir_estado_inverso(self, estado_api):
+        # Convertir estado de la API al formato de la interfaz
         mapping = {
             "pending": "Abierto",
             "in_progress": "En progreso",

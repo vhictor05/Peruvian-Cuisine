@@ -1,14 +1,8 @@
-﻿from fastapi import FastAPI, HTTPException
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
-import uvicorn
+from routes import reports
 
-app = FastAPI(
-    title="Peruvian Cuisine API",
-    description="API REST para el sistema de Restaurant, Hotel y Discoteca",
-    version="1.0.0"
-)
+app = FastAPI()
 
 # Configurar CORS
 app.add_middleware(
@@ -19,5 +13,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Incluir las rutas
+app.include_router(reports.router)
+
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
