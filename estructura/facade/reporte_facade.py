@@ -7,13 +7,13 @@ class ReporteFacade:
         
     def crear_reporte(self, datos):
         try:
-            # Adaptar datos al formato de la API
+            # Adaptar datos al formato de la API (campos en español)
             reporte_data = {
-                "title": datos['titulo'],
-                "description": datos['descripcion'],
-                "module": datos['modulo'].lower(),
-                "severity": self._convertir_urgencia(datos['urgencia']),
-                "reported_by": datos['usuario']
+                "titulo": datos['titulo'],
+                "descripcion": datos['descripcion'],
+                "modulo": datos['modulo'].lower(),
+                "urgencia": self._convertir_urgencia(datos['urgencia']),
+                "reportado_por": datos['usuario']
             }
             
             response = requests.post(f"{self.API_URL}/reports", json=reporte_data)
@@ -28,12 +28,12 @@ class ReporteFacade:
             
     def obtener_reportes_filtrados(self, filtros):
         try:
-            # Construir parámetros de consulta
+            # Construir parámetros de consulta (usar nombres de la API)
             params = {}
             if filtros['modulo'] != "Todos":
-                params['module'] = filtros['modulo'].lower()
+                params['modulo'] = filtros['modulo'].lower()
             if filtros['estado'] != "Todos":
-                params['status'] = self._convertir_estado(filtros['estado'])
+                params['estado'] = self._convertir_estado(filtros['estado'])
                 
             response = requests.get(f"{self.API_URL}/reports", params=params)
             
@@ -54,7 +54,7 @@ class ReporteFacade:
             for id_reporte in ids:
                 response = requests.put(
                     f"{self.API_URL}/reports/{id_reporte}",
-                    json={"status": estado_api}
+                    json={"estado": estado_api}
                 )
                 if response.status_code == 200:
                     exitos += 1
@@ -120,15 +120,16 @@ class ReporteFacade:
     def _convertir_a_reporte(self, datos_api):
         from apps.Reportes.dominio import Reporte
         
+        # CORREGIDO: Usar los nombres de campo reales de la API (en español)
         return (Reporte.builder()
             .con_id(datos_api['id'])
-            .con_titulo(datos_api['title'])
-            .con_descripcion(datos_api['description'])
-            .en_modulo(datos_api['module'].capitalize())
-            .con_urgencia(self._convertir_urgencia_inverso(datos_api['severity']))
-            .con_estado(self._convertir_estado_inverso(datos_api['status']))
-            .reportado_por(datos_api['reported_by'])
-            .con_fecha(datetime.fromisoformat(datos_api['created_at']))
+            .con_titulo(datos_api['titulo'])  # ✅ 'titulo' no 'title'
+            .con_descripcion(datos_api['descripcion'])  # ✅ 'descripcion' no 'description'
+            .en_modulo(datos_api['modulo'].capitalize())  # ✅ 'modulo' no 'module'
+            .con_urgencia(self._convertir_urgencia_inverso(datos_api['urgencia']))  # ✅ 'urgencia' no 'severity'
+            .con_estado(self._convertir_estado_inverso(datos_api['estado']))  # ✅ 'estado' no 'status'
+            .reportado_por(datos_api['reportado_por'])  # ✅ 'reportado_por' no 'reported_by'
+            .con_fecha(self._parse_fecha(datos_api['fecha_reporte']))  # ✅ 'fecha_reporte' no 'created_at'
             .build())
 
     def _convertir_urgencia_inverso(self, urgencia_api):
@@ -147,3 +148,28 @@ class ReporteFacade:
             "resolved": "Resuelto"
         }
         return mapping.get(estado_api, "Abierto")
+
+    def _parse_fecha(self, fecha_str):
+        """Convierte la fecha de string a datetime"""
+        try:
+            if isinstance(fecha_str, str):
+                # Intentar varios formatos de fecha
+                formatos = [
+                    '%Y-%m-%d %H:%M:%S',
+                    '%Y-%m-%d %H:%M:%S.%f',
+                    '%Y-%m-%dT%H:%M:%S',
+                    '%Y-%m-%dT%H:%M:%S.%f'
+                ]
+                
+                for formato in formatos:
+                    try:
+                        return datetime.strptime(fecha_str.split('.')[0], formato)
+                    except ValueError:
+                        continue
+                        
+                # Si no funciona ningún formato, usar el formato por defecto
+                return datetime.strptime(fecha_str[:19], '%Y-%m-%d %H:%M:%S')
+            else:
+                return fecha_str
+        except Exception:
+            return datetime.now()
