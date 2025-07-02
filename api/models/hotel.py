@@ -1,7 +1,6 @@
-﻿from pydantic import BaseModel, validator
+﻿from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from datetime import datetime
-from .base import BaseDBModel
 
 # ===== HUÉSPEDES =====
 class HuespedBase(BaseModel):
@@ -11,11 +10,32 @@ class HuespedBase(BaseModel):
     telefono: Optional[str] = None
 
 class HuespedCreate(HuespedBase):
-    @validator('rut')
+    @field_validator('rut')
+    @classmethod
     def validate_rut(cls, v):
         # Validación básica de RUT chileno
-        if not v or len(v.replace('-', '').replace('.', '')) < 8:
-            raise ValueError('RUT inválido')
+        if not v:
+            raise ValueError('RUT es requerido')
+        
+        # Permitir diferentes formatos de RUT
+        rut_clean = v.replace('-', '').replace('.', '').strip()
+        if len(rut_clean) < 8:
+            raise ValueError('RUT debe tener al menos 8 caracteres')
+        
+        return v
+
+    @field_validator('nombre')
+    @classmethod
+    def validate_nombre(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Nombre es requerido')
+        return v.strip()
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        if v and '@' not in v:
+            raise ValueError('Email debe tener formato válido')
         return v
 
 class HuespedUpdate(BaseModel):
@@ -25,12 +45,12 @@ class HuespedUpdate(BaseModel):
 
 class Huesped(HuespedBase):
     id: int
-    fecha_registro: datetime
+    fecha_registro: Optional[datetime] = None  # HACER OPCIONAL
 
     class Config:
         from_attributes = True
         json_encoders = {
-            datetime: lambda v: v.strftime('%Y-%m-%d %H:%M:%S')
+            datetime: lambda v: v.strftime('%Y-%m-%d %H:%M:%S') if v else None
         }
 
 # ===== HABITACIONES =====

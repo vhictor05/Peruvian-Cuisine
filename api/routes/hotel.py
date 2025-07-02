@@ -9,15 +9,17 @@ from datetime import datetime
 from database import get_db_connection, close_connection
 import time
 import functools
+import traceback
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/v1/hotel",
     tags=["hotel"]
 )
-
-# Caché para consultas frecuentes
-hotel_cache = {}
-CACHE_TTL = 60
 
 def measure_time(func):
     @functools.wraps(func)
@@ -25,7 +27,7 @@ def measure_time(func):
         start_time = time.time()
         result = await func(*args, **kwargs)
         end_time = time.time()
-        print(f"{func.__name__} ejecutado en {end_time - start_time:.4f} segundos")
+        logger.info(f"{func.__name__} ejecutado en {end_time - start_time:.4f} segundos")
         return result
     return wrapper
 
@@ -39,10 +41,11 @@ async def get_huespedes():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # QUITAR fecha_registro del SELECT
         cursor.execute("""
-            SELECT id, nombre, rut, email, telefono, fecha_registro 
+            SELECT id, nombre, rut, email, telefono 
             FROM huespedes 
-            ORDER BY fecha_registro DESC
+            ORDER BY id DESC
         """)
         rows = cursor.fetchall()
         
@@ -52,11 +55,13 @@ async def get_huespedes():
             rut=row['rut'],
             email=row['email'],
             telefono=row['telefono'],
-            fecha_registro=datetime.fromisoformat(row['fecha_registro'])
+            fecha_registro=datetime.now()  # Usar fecha actual por defecto
         ) for row in rows]
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en get_huespedes: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
@@ -67,22 +72,32 @@ async def create_huesped(huesped: HuespedCreate):
     """Crea un nuevo huésped"""
     conn = None
     try:
+        logger.info(f"Creando huésped: {huesped.model_dump()}")
+        
         conn = get_db_connection()
         cursor = conn.cursor()
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         # Verificar si el RUT ya existe
         cursor.execute("SELECT id FROM huespedes WHERE rut = ?", (huesped.rut,))
-        if cursor.fetchone():
+        existing_huesped = cursor.fetchone()
+        if existing_huesped:
             raise HTTPException(status_code=400, detail="Ya existe un huésped con este RUT")
         
+        # Insertar nuevo huésped SIN fecha_registro
         cursor.execute("""
-            INSERT INTO huespedes (nombre, rut, email, telefono, fecha_registro)
-            VALUES (?, ?, ?, ?, ?)
-        """, (huesped.nombre, huesped.rut, huesped.email, huesped.telefono, current_time))
+            INSERT INTO huespedes (nombre, rut, email, telefono)
+            VALUES (?, ?, ?, ?)
+        """, (
+            huesped.nombre.strip(),
+            huesped.rut.strip(),
+            huesped.email.strip() if huesped.email else None,
+            huesped.telefono.strip() if huesped.telefono else None
+        ))
         
         huesped_id = cursor.lastrowid
         conn.commit()
+        
+        logger.info(f"Huésped creado con ID: {huesped_id}")
         
         return Huesped(
             id=huesped_id,
@@ -90,13 +105,17 @@ async def create_huesped(huesped: HuespedCreate):
             rut=huesped.rut,
             email=huesped.email,
             telefono=huesped.telefono,
-            fecha_registro=datetime.now()
+            fecha_registro=datetime.now()  # Solo para la respuesta
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en create_huesped: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
@@ -110,8 +129,8 @@ async def update_huesped(huesped_id: int, huesped_update: HuespedUpdate):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Verificar que el huésped existe
-        cursor.execute("SELECT * FROM huespedes WHERE id = ?", (huesped_id,))
+        # Verificar que el huésped existe - QUITAR fecha_registro
+        cursor.execute("SELECT id, nombre, rut, email, telefono FROM huespedes WHERE id = ?", (huesped_id,))
         existing = cursor.fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="Huésped no encontrado")
@@ -121,21 +140,21 @@ async def update_huesped(huesped_id: int, huesped_update: HuespedUpdate):
         params = []
         if huesped_update.nombre is not None:
             updates.append("nombre = ?")
-            params.append(huesped_update.nombre)
+            params.append(huesped_update.nombre.strip())
         if huesped_update.email is not None:
             updates.append("email = ?")
-            params.append(huesped_update.email)
+            params.append(huesped_update.email.strip() if huesped_update.email else None)
         if huesped_update.telefono is not None:
             updates.append("telefono = ?")
-            params.append(huesped_update.telefono)
+            params.append(huesped_update.telefono.strip() if huesped_update.telefono else None)
         
         if updates:
             params.append(huesped_id)
             cursor.execute(f"UPDATE huespedes SET {', '.join(updates)} WHERE id = ?", params)
             conn.commit()
         
-        # Obtener datos actualizados
-        cursor.execute("SELECT * FROM huespedes WHERE id = ?", (huesped_id,))
+        # Obtener datos actualizados - QUITAR fecha_registro
+        cursor.execute("SELECT id, nombre, rut, email, telefono FROM huespedes WHERE id = ?", (huesped_id,))
         row = cursor.fetchone()
         
         return Huesped(
@@ -144,13 +163,15 @@ async def update_huesped(huesped_id: int, huesped_update: HuespedUpdate):
             rut=row['rut'],
             email=row['email'],
             telefono=row['telefono'],
-            fecha_registro=datetime.fromisoformat(row['fecha_registro'])
+            fecha_registro=datetime.now()  # Usar fecha actual por defecto
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en update_huesped: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
@@ -169,7 +190,8 @@ async def delete_huesped(huesped_id: int):
             SELECT COUNT(*) as count FROM reservas 
             WHERE huesped_id = ? AND estado != 'Cancelada'
         """, (huesped_id,))
-        if cursor.fetchone()['count'] > 0:
+        active_reservations = cursor.fetchone()
+        if active_reservations and active_reservations['count'] > 0:
             raise HTTPException(
                 status_code=400, 
                 detail="No se puede eliminar un huésped con reservas activas"
@@ -185,7 +207,9 @@ async def delete_huesped(huesped_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en delete_huesped: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
@@ -220,7 +244,8 @@ async def get_habitaciones(disponible: Optional[bool] = None):
         ) for row in rows]
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en get_habitaciones: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
@@ -258,7 +283,8 @@ async def create_habitacion(habitacion: HabitacionCreate):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en create_habitacion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
@@ -308,7 +334,8 @@ async def get_reservas(estado: Optional[str] = None):
         ) for row in rows]
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en get_reservas: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
@@ -366,7 +393,11 @@ async def create_reserva(reserva: ReservaCreate):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en create_reserva: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
@@ -430,7 +461,9 @@ async def update_reserva(reserva_id: int, reserva_update: ReservaUpdate):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en update_reserva: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
@@ -462,7 +495,9 @@ async def delete_reserva(reserva_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en delete_reserva: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
     finally:
         if conn:
             close_connection(conn)
