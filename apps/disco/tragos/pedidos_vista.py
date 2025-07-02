@@ -3,11 +3,15 @@ from tkinter import messagebox, ttk
 from apps.disco.utils.ui_components import create_treeview
 from estructura.builder.pedido_builder import PedidoBuilder
 from fpdf import FPDF
+import requests
+import threading
+
+API_TRAGOS_URL = "http://localhost:8000/api/v1/disco/tragos"
 
 class PedidosTragosVista:
-    def __init__(self, parent, facade):
+    def __init__(self, parent, facade=None):
         self.parent = parent
-        self.facade = facade
+        # self.facade = facade  # Ya no se usa
         
     def show(self):
         self.setup_cliente_frame()
@@ -352,41 +356,82 @@ class PedidosTragosVista:
         )
 
     def actualizar_lista_clientes_combo(self):
-        clientes = self.facade.listar_clientes()
-        valores = [f"{c.nombre} ({c.rut})" for c in clientes]
-        self.lista_clientes.configure(values=valores)
+        def task():
+            try:
+                r = requests.get("http://localhost:8000/api/v1/disco/clientes?limit=1000&offset=0")
+                if r.status_code == 200:
+                    clientes = r.json()
+                    valores = [f"{c['nombre']} ({c['rut']})" for c in clientes]
+                    self.parent.after(0, lambda: self.lista_clientes.configure(values=valores))
+                else:
+                    self.parent.after(0, lambda: self.lista_clientes.configure(values=[]))
+            except Exception:
+                self.parent.after(0, lambda: self.lista_clientes.configure(values=[]))
+        threading.Thread(target=task).start()
 
     def filtrar_clientes(self, event):
-        busqueda = self.busqueda_cliente.get().lower()
-        clientes = self.facade.listar_clientes()
-        
-        if busqueda:
-            filtrados = [f"{c.nombre} ({c.rut})" for c in clientes 
-                        if busqueda in c.nombre.lower() or busqueda in c.rut]
-        else:
-            filtrados = [f"{c.nombre} ({c.rut})" for c in clientes]
-        
-        self.lista_clientes.configure(values=filtrados)
-        self.lista_clientes.set("")
+        def task():
+            busqueda = self.busqueda_cliente.get().lower()
+            try:
+                r = requests.get("http://localhost:8000/api/v1/disco/clientes?limit=1000&offset=0")
+                if r.status_code == 200:
+                    clientes = r.json()
+                    if busqueda:
+                        filtrados = [f"{c['nombre']} ({c['rut']})" for c in clientes if busqueda in c['nombre'].lower() or busqueda in c['rut']]
+                    else:
+                        filtrados = [f"{c['nombre']} ({c['rut']})" for c in clientes]
+                    self.parent.after(0, lambda: [self.lista_clientes.configure(values=filtrados), self.lista_clientes.set("")])
+                else:
+                    self.parent.after(0, lambda: [self.lista_clientes.configure(values=[]), self.lista_clientes.set("")])
+            except Exception:
+                self.parent.after(0, lambda: [self.lista_clientes.configure(values=[]), self.lista_clientes.set("")])
+        threading.Thread(target=task).start()
 
     def actualizar_lista_tragos_combo(self):
-        tragos = self.facade.listar_tragos()
-        valores = [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
-        self.lista_tragos.configure(values=valores)
+        def task():
+            try:
+                r = requests.get(f"{API_TRAGOS_URL}?limit=1000&offset=0")
+                if r.status_code == 200:
+                    tragos = r.json()
+                    valores = [f"{t['nombre']} (${t['precio']:.2f})" for t in tragos]
+                    self.parent.after(0, lambda: self.lista_tragos.configure(values=valores))
+                else:
+                    self.parent.after(0, lambda: self.lista_tragos.configure(values=[]))
+            except Exception:
+                self.parent.after(0, lambda: self.lista_tragos.configure(values=[]))
+        threading.Thread(target=task).start()
 
     def filtrar_tragos(self, event):
-        busqueda = self.busqueda_trago.get().lower()
-        tragos = self.facade.listar_tragos()
-        
-        if busqueda:
-            filtrados = [f"{t.nombre} (${t.precio:.2f})" for t in tragos 
-                        if busqueda in t.nombre.lower() or 
-                        busqueda in (t.categoria.lower() if t.categoria else "")]
-        else:
-            filtrados = [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
-        
-        self.lista_tragos.configure(values=filtrados)
-        self.lista_tragos.set("")
+        def task():
+            busqueda = self.busqueda_trago.get().lower()
+            try:
+                r = requests.get(f"{API_TRAGOS_URL}?limit=1000&offset=0")
+                if r.status_code == 200:
+                    tragos = r.json()
+                    if busqueda:
+                        filtrados = [f"{t['nombre']} (${t['precio']:.2f})" for t in tragos if busqueda in t['nombre'].lower() or (t.get('categoria','').lower() if t.get('categoria') else "")]
+                    else:
+                        filtrados = [f"{t['nombre']} (${t['precio']:.2f})" for t in tragos]
+                    self.parent.after(0, lambda: [self.lista_tragos.configure(values=filtrados), self.lista_tragos.set("")])
+                else:
+                    self.parent.after(0, lambda: [self.lista_tragos.configure(values=[]), self.lista_tragos.set("")])
+            except Exception:
+                self.parent.after(0, lambda: [self.lista_tragos.configure(values=[]), self.lista_tragos.set("")])
+        threading.Thread(target=task).start()
+
+    def obtener_trago_por_nombre(self, nombre, callback):
+        def task():
+            try:
+                r = requests.get(f"{API_TRAGOS_URL}?limit=1000&offset=0")
+                if r.status_code == 200:
+                    tragos = r.json()
+                    trago = next((t for t in tragos if t['nombre'] == nombre), None)
+                    self.parent.after(0, lambda: callback(trago))
+                else:
+                    self.parent.after(0, lambda: callback(None))
+            except Exception:
+                self.parent.after(0, lambda: callback(None))
+        threading.Thread(target=task).start()
 
     def on_cliente_seleccionado(self, event=None):
         cliente_str = self.lista_clientes.get()

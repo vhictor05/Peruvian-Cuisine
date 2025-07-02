@@ -5,6 +5,8 @@ import os
 from tkinter import messagebox
 from PIL import Image, ImageTk
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Configuración de la interfaz
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")

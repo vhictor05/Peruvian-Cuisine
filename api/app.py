@@ -1,8 +1,16 @@
-﻿from fastapi import FastAPI, Request
+﻿import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from routes import reports
+from routes import disco  # <-- Importar el router de disco
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
+from estructura.crud.trago_crud import TragoCRUD
+from sqlalchemy.orm import sessionmaker
+from Database.DB import engine
 
 app = FastAPI(
     title="Peruvian Cuisine API",
@@ -34,11 +42,16 @@ app.add_middleware(
 
 # Incluir las rutas
 app.include_router(reports.router)
+app.include_router(disco.router)  # <-- Incluir el router de disco
 
 # Ruta para verificar el estado del servicio
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "version": "1.0.1"}
+
+@app.on_event("startup")
+def inicializar_tragos_startup():
+    pass
 
 if __name__ == "__main__":
     import uvicorn
@@ -53,6 +66,5 @@ if __name__ == "__main__":
         "app:app", 
         host="0.0.0.0", 
         port=8000, 
-        workers=num_cores,
         log_level="info"
     )
