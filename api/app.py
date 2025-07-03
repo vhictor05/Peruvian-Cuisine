@@ -1,7 +1,8 @@
-import sys
+﻿import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import multiprocessing
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from routes import reports
@@ -71,7 +72,7 @@ async def root():
     }
 
 if __name__ == "__main__":
-    import uvicorn
+
     
     # Optimizar número de procesos a utilizar
     num_cores = multiprocessing.cpu_count()
