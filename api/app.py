@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import reports
 from routes import disco  # <-- Importar el router de disco
 from routes import reports, hotel  # Agregar import de hotel
+from routes import reports, restaurant
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from estructura.crud.trago_crud import TragoCRUD
@@ -45,6 +46,7 @@ app.add_middleware(
 app.include_router(reports.router)
 app.include_router(disco.router)  # <-- Incluir el router de disco
 app.include_router(hotel.router)  # Agregar rutas de hotel
+app.include_router(restaurant.router)
 
 # Ruta para verificar el estado del servicio
 @app.get("/health")
@@ -59,13 +61,22 @@ async def health_check():
 def inicializar_tragos_startup():
     pass
 
+# Ruta raíz
+@app.get("/")
+async def root():
+    return {
+        "message": "Peruvian Cuisine API", 
+        "version": "1.0.1",
+        "docs": "/docs"
+    }
+
 if __name__ == "__main__":
     import uvicorn
-    import multiprocessing
     
     # Optimizar número de procesos a utilizar
     num_cores = multiprocessing.cpu_count()
     workers = min(4, max(1, num_cores - 1))
+    print("Iniciando servidor en modo desarrollo...")
     
     print(f"🚀 Iniciando servidor con {workers} workers")
     print(f"📡 API disponible en: http://localhost:8000")
@@ -73,7 +84,8 @@ if __name__ == "__main__":
     
     uvicorn.run(
         "app:app", 
-        host="0.0.0.0", 
+        host="127.0.0.1",
         port=8000, 
+        reload=True,
         log_level="info"
     )
