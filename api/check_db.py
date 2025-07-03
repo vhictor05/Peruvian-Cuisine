@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from datetime import datetime
 
 def check_database():
     # Apuntar a la raíz del proyecto, no a la carpeta api
@@ -65,5 +66,71 @@ def check_database():
         if 'conn' in locals():
             conn.close()
 
+def check_and_create_tables():
+    """Verifica y crea las tablas necesarias"""
+    try:
+        conn = sqlite3.connect('main.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Crear tabla de huéspedes
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS huespedes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                rut TEXT UNIQUE NOT NULL,
+                email TEXT,
+                telefono TEXT,
+                fecha_registro TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Crear tabla de habitaciones
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS habitaciones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                numero TEXT UNIQUE NOT NULL,
+                tipo TEXT NOT NULL,
+                precio REAL NOT NULL,
+                disponible BOOLEAN NOT NULL DEFAULT 1
+            )
+        ''')
+        
+        # Crear tabla de reservas
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reservas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                huesped_id INTEGER NOT NULL,
+                habitacion_id INTEGER NOT NULL,
+                fecha_entrada TEXT NOT NULL,
+                fecha_salida TEXT NOT NULL,
+                precio_final REAL NOT NULL,
+                estado TEXT NOT NULL DEFAULT 'Pendiente',
+                fecha_reserva TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (huesped_id) REFERENCES huespedes (id),
+                FOREIGN KEY (habitacion_id) REFERENCES habitaciones (id)
+            )
+        ''')
+        
+        conn.commit()
+        print("✅ Tablas verificadas/creadas correctamente")
+        
+        # Verificar estructura
+        cursor.execute("PRAGMA table_info(huespedes)")
+        columns = cursor.fetchall()
+        print(f"📊 Estructura tabla huéspedes: {[col['name'] for col in columns]}")
+        
+        cursor.execute("SELECT COUNT(*) as count FROM huespedes")
+        count = cursor.fetchone()['count']
+        print(f"📊 Número de huéspedes en BD: {count}")
+        
+        conn.close()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error al verificar BD: {e}")
+        return False
+
 if __name__ == "__main__":
     check_database()
+    check_and_create_tables()

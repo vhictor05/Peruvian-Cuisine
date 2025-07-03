@@ -1,6 +1,6 @@
 ﻿from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from routes import reports
+from routes import reports, hotel  # Agregar import de hotel
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -12,7 +12,7 @@ app = FastAPI(
 
 # Middleware para medir tiempo de respuesta
 class TimingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
+    async def dispatch(self, request: Request, call_next):
         start_time = time.time()
         response = await call_next(request)
         process_time = time.time() - start_time
@@ -34,11 +34,16 @@ app.add_middleware(
 
 # Incluir las rutas
 app.include_router(reports.router)
+app.include_router(hotel.router)  # Agregar rutas de hotel
 
 # Ruta para verificar el estado del servicio
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "version": "1.0.1"}
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "modules": ["reports", "hotel"]  # Actualizar módulos disponibles
+    }
 
 if __name__ == "__main__":
     import uvicorn
@@ -46,9 +51,12 @@ if __name__ == "__main__":
     
     # Optimizar número de procesos a utilizar
     num_cores = multiprocessing.cpu_count()
-    print(f"Iniciando servidor con {num_cores} procesos")
+    workers = min(4, max(1, num_cores - 1))
     
-    # Iniciar Uvicorn con múltiples procesos
+    print(f"🚀 Iniciando servidor con {workers} workers")
+    print(f"📡 API disponible en: http://localhost:8000")
+    print(f"📖 Documentación en: http://localhost:8000/docs")
+    
     uvicorn.run(
         "app:app", 
         host="0.0.0.0", 
