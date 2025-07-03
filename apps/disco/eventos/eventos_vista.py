@@ -355,21 +355,40 @@ class EventosVista:
 
     def actualizar_lista_eventos(self):
         def task():
-            self.evento_tree.delete(*self.evento_tree.get_children())
             try:
+                if hasattr(self, 'evento_tree') and self.evento_tree.winfo_exists():
+                    self.evento_tree.delete(*self.evento_tree.get_children())
+                else:
+                    return
                 r = requests.get(API_URL)
                 if r.status_code == 200:
                     eventos = r.json()
                     def insert_events():
-                        for e in eventos:
-                            self.evento_tree.insert("", "end", values=(
-                                e['id'], e['nombre'], e['fecha'], e['precio_entrada'], e['aforo_maximo']
-                            ))
-                    self.parent.after(0, insert_events)
+                        try:
+                            if hasattr(self, 'evento_tree') and self.evento_tree.winfo_exists():
+                                for e in eventos:
+                                    self.evento_tree.insert("", "end", values=(
+                                        e['id'], e['nombre'], e['fecha'], e['precio_entrada'], e['aforo_maximo']
+                                    ))
+                        except Exception:
+                            pass
+                    try:
+                        if self.parent.winfo_exists():
+                            self.parent.after(0, insert_events)
+                    except Exception:
+                        pass
                 else:
-                    self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudieron cargar los eventos: {r.text}"))
+                    try:
+                        if self.parent.winfo_exists():
+                            self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudieron cargar los eventos: {r.text}"))
+                    except Exception:
+                        pass
             except Exception as e:
-                self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudieron cargar los eventos: {str(e)}"))
+                try:
+                    if self.parent.winfo_exists():
+                        self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudieron cargar los eventos: {str(e)}"))
+                except Exception:
+                    pass
         threading.Thread(target=task).start()
 
     def limpiar_campos(self):

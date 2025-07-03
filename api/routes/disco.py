@@ -8,6 +8,7 @@ from models.disco import (
     ReservaMesa, ReservaMesaCreate
 )
 from models.disco import Trago, TragoCreate  # Importar modelos de Trago
+from models.pedido import Pedido, PedidoCreate, PedidoDetalle
 from datetime import datetime
 from database import get_db_connection, close_connection
 import time
@@ -15,6 +16,7 @@ import functools
 import cProfile
 import pstats
 import io
+import json
 
 router = APIRouter(
     prefix="/api/v1/disco",
@@ -512,148 +514,6 @@ async def delete_entrada(entrada_id: int):
         if conn:
             close_connection(conn)
 
-# --- Endpoints para Mesa ---
-@router.get("/mesas", response_model=List[Mesa])
-@measure_time
-async def get_mesas():
-    cache_key = "mesas"
-    current_time = time.time()
-    if cache_key in disco_cache:
-        cached_time, cached_data = disco_cache[cache_key]
-        if current_time - cached_time < CACHE_TTL:
-            print(f"Obteniendo datos de caché para {cache_key}")
-            return cached_data
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = "SELECT id, numero, capacidad, ubicacion FROM mesas ORDER BY id DESC LIMIT 100"
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        result = [Mesa(
-            id=row['id'],
-            numero=row['numero'],
-            capacidad=row['capacidad'],
-            ubicacion=row['ubicacion']
-        ) for row in rows]
-        disco_cache[cache_key] = (current_time, result)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            close_connection(conn)
-
-@router.post("/mesas", response_model=Mesa, status_code=201)
-@measure_time
-async def create_mesa(mesa: MesaCreate):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        conn.execute("BEGIN IMMEDIATE")
-        query = """
-        INSERT INTO mesas (numero, capacidad, ubicacion)
-        VALUES (?, ?, ?)
-        """
-        params = (
-            mesa.numero,
-            mesa.capacidad,
-            mesa.ubicacion
-        )
-        cursor.execute(query, params)
-        mesa_id = cursor.lastrowid
-        conn.commit()
-        cursor.execute(
-            "SELECT id, numero, capacidad, ubicacion FROM mesas WHERE id = ?",
-            (mesa_id,)
-        )
-        row = cursor.fetchone()
-        global disco_cache
-        disco_cache = {}
-        return Mesa(
-            id=row['id'],
-            numero=row['numero'],
-            capacidad=row['capacidad'],
-            ubicacion=row['ubicacion']
-        )
-    except Exception as e:
-        if conn:
-            try:
-                conn.rollback()
-            except:
-                pass
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            close_connection(conn)
-
-@router.get("/mesas/{mesa_id}", response_model=Mesa)
-@measure_time
-async def get_mesa(mesa_id: int):
-    cache_key = f"mesa_{mesa_id}"
-    current_time = time.time()
-    if cache_key in disco_cache:
-        cached_time, cached_data = disco_cache[cache_key]
-        if current_time - cached_time < CACHE_TTL:
-            print(f"Obteniendo mesa {mesa_id} de caché")
-            return cached_data
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, numero, capacidad, ubicacion FROM mesas WHERE id = ?",
-            (mesa_id,)
-        )
-        row = cursor.fetchone()
-        if row is None:
-            raise HTTPException(status_code=404, detail="Mesa no encontrada")
-        result = Mesa(
-            id=row['id'],
-            numero=row['numero'],
-            capacidad=row['capacidad'],
-            ubicacion=row['ubicacion']
-        )
-        disco_cache[cache_key] = (current_time, result)
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            close_connection(conn)
-
-@router.delete("/mesas/{mesa_id}", status_code=204)
-@measure_time
-async def delete_mesa(mesa_id: int):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        conn.execute("BEGIN IMMEDIATE")
-        cursor.execute("SELECT id FROM mesas WHERE id = ?", (mesa_id,))
-        if cursor.fetchone() is None:
-            conn.rollback()
-            raise HTTPException(status_code=404, detail="Mesa no encontrada")
-        cursor.execute("DELETE FROM mesas WHERE id = ?", (mesa_id,))
-        conn.commit()
-        global disco_cache
-        disco_cache = {}
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            try:
-                conn.rollback()
-            except:
-                pass
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            close_connection(conn)
-
 # --- Endpoints para ReservaMesa ---
 @router.get("/reservas", response_model=List[ReservaMesa])
 @measure_time
@@ -807,20 +667,17 @@ async def delete_reserva(reserva_id: int):
 # --- Endpoints para Trago ---
 @router.get("/tragos", response_model=List[Trago])
 @measure_time
-async def get_tragos(limit: int = 20, offset: int = 0):
-    cache_key = f"tragos_{limit}_{offset}"
-    current_time = time.time()
-    if cache_key in disco_cache:
-        cached_time, cached_data = disco_cache[cache_key]
-        if current_time - cached_time < CACHE_TTL:
-            print(f"Obteniendo datos de caché para {cache_key}")
-            return cached_data
+async def get_tragos(nombre: Optional[str] = None, limit: int = 20, offset: int = 0):
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        query = "SELECT id, nombre, descripcion, precio, categoria, disponible, stock FROM tragos ORDER BY id DESC LIMIT ? OFFSET ?"
-        cursor.execute(query, (limit, offset))
+        if nombre:
+            query = "SELECT id, nombre, descripcion, precio, categoria, disponible, stock FROM tragos WHERE nombre = ?"
+            cursor.execute(query, (nombre,))
+        else:
+            query = "SELECT id, nombre, descripcion, precio, categoria, disponible, stock FROM tragos ORDER BY id DESC LIMIT ? OFFSET ?"
+            cursor.execute(query, (limit, offset))
         rows = cursor.fetchall()
         result = [Trago(
             id=row['id'],
@@ -831,7 +688,6 @@ async def get_tragos(limit: int = 20, offset: int = 0):
             disponible=row['disponible'],
             stock=row['stock']
         ) for row in rows]
-        disco_cache[cache_key] = (current_time, result)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -968,6 +824,57 @@ async def delete_trago(trago_id: int):
                 conn.rollback()
             except:
                 pass
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            close_connection(conn)
+
+# --- Endpoints para Pedidos ---
+@router.post("/pedidos", response_model=Pedido, status_code=201)
+@measure_time
+async def create_pedido(pedido: PedidoCreate):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        conn.execute("BEGIN IMMEDIATE")
+        fecha = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Insertar en pedidos_tragos
+        cursor.execute(
+            """
+            INSERT INTO pedidos_tragos (cliente_id, total, fecha, detalles)
+            VALUES (?, ?, ?, ?)
+            """,
+            (pedido.cliente_id, pedido.total, fecha, json.dumps([detalle.dict() for detalle in pedido.detalles]))
+        )
+        pedido_id = cursor.lastrowid
+        conn.commit()
+        return Pedido(id=pedido_id, cliente_id=pedido.cliente_id, total=pedido.total, fecha=datetime.strptime(fecha, '%Y-%m-%d %H:%M:%S'), detalles=pedido.detalles)
+    except Exception as e:
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            close_connection(conn)
+
+@router.get("/pedidos/{pedido_id}", response_model=Pedido)
+@measure_time
+async def get_pedido(pedido_id: int):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, cliente_id, total, fecha, detalles FROM pedidos_tragos WHERE id = ?", (pedido_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        detalles = [PedidoDetalle(**d) for d in json.loads(row['detalles'])] if row['detalles'] else []
+        return Pedido(id=row['id'], cliente_id=row['cliente_id'], total=row['total'], fecha=datetime.strptime(row['fecha'], '%Y-%m-%d %H:%M:%S'), detalles=detalles)
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
