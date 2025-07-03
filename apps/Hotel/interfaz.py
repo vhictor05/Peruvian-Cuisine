@@ -4,17 +4,28 @@ from tkinter import ttk, messagebox
 from apps.Hotel.huespedes.huespedes_vista import HuespedesVista
 from apps.Hotel.habitaciones.habitaciones_vista import HabitacionesVista
 from apps.Hotel.reservas.reservas_vista import ReservasVista
-from Database.DB import get_db
+from Database.DB import get_db, Base, engine
 from estructura.facade.hotelfacade import HotelFacade
+from estructura.facade.hotel_api_facade import HotelAPIFacade
 from utils.report_button import create_report_button
+import requests
+
 class HotelApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Hotel")
         self.geometry("1100x650")
-        self.db = next(get_db())
-        self.hotel_facade = HotelFacade(self.db)
         self.configure(fg_color="#1e1e2d", corner_radius=15)
+        
+        # Configurar tema oscuro
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+        
+        # Crear tablas si no existen (para compatibilidad)
+        Base.metadata.create_all(bind=engine)
+        
+        # Inicializar facade (API o base de datos local)
+        self._initialize_facade()
         
         # Configurar el estilo del Treeview
         self.configure_treeview_style()
@@ -30,50 +41,70 @@ class HotelApp(ctk.CTk):
         
         # Mostrar panel de huéspedes por defecto
         self.show_huespedes()
+    
+    def _initialize_facade(self):
+        """Inicializa el facade API o base de datos local"""
+        try:
+            # Intentar conectar con la API
+            response = requests.get("http://localhost:8000/health", timeout=5)
+            if response.status_code == 200:
+                print("✅ Hotel conectado a la API")
+                self.hotel_facade = HotelAPIFacade()
+                self.use_api = True
+            else:
+                print("⚠️ API no disponible - Hotel usando base de datos local")
+                self.db = next(get_db())
+                self.hotel_facade = HotelFacade(self.db)
+                self.use_api = False
+        except requests.RequestException:
+            print("⚠️ API no disponible - Hotel usando base de datos local")
+            self.db = next(get_db())
+            self.hotel_facade = HotelFacade(self.db)
+            self.use_api = False
+        except Exception as e:
+            print(f"❌ Error al inicializar facade: {e}")
+            self.db = next(get_db())
+            self.hotel_facade = HotelFacade(self.db)
+            self.use_api = False
 
     def configure_treeview_style(self):
         style = ttk.Style()
-        style.theme_use("default")
-        style.configure("Treeview", 
-            background="#1e1e2d",
-            foreground="white",
-            fieldbackground="#1e1e2d",
-            bordercolor="#3b3b3b",
-            borderwidth=0
-        )
+        style.theme_use("clam")
+        
+        style.configure("Treeview",
+                        background="#25253a",
+                        foreground="white",
+                        rowheight=25,
+                        fieldbackground="#25253a",
+                        bordercolor="#f72585",
+                        borderwidth=2)
+        
+        style.map("Treeview",
+                  background=[('selected', '#f72585')])
+        
         style.configure("Treeview.Heading",
-            background="#1e1e2d",
-            foreground="white",
-            borderwidth=1
-        )
-        style.map('Treeview', 
-            background=[('selected', '#f72585')],
-            foreground=[('selected', 'white')]
-        )
+                        background="#f72585",
+                        foreground="white",
+                        relief="flat")
+        
+        style.map("Treeview.Heading",
+                  background=[('active', '#fa5c9c')])
 
     def create_title_frame(self):
         self.title_frame = ctk.CTkFrame(
             self, 
             fg_color="#1e1e2d",
-            height=60,
             corner_radius=0
         )
-        self.title_frame.grid(row=0, column=0, padx=30, pady=65, sticky="ew")
-        self.title_frame.grid_propagate(False)
+        self.title_frame.grid(row=0, column=0, columnspan=2, pady="30", sticky="ew")
         
-        ctk.CTkLabel(
-            self.title_frame,
-            text="HOTEL",
-            font=("Arial", 26, "bold"),
-            text_color="#f72585"
-        ).place(relx=0.2, rely=0.3, anchor="w")
-
-        ctk.CTkLabel(
-            self.title_frame,
-            text="MANAGER",
-            font=("Arial", 23),
-            text_color="#fa5c9c"
-        ).place(relx=0.2, rely=0.7, anchor="w")
+        self.app_title = ctk.CTkLabel(
+            self.title_frame, 
+            text="HOTEL", 
+            text_color="#f72585", 
+            font=("Arial", 26, "bold")
+        )
+        self.app_title.pack(pady=0, padx=(20,0), anchor="w")
 
     def create_menu_frame(self):
         self.menu_frame = ctk.CTkFrame(
@@ -85,7 +116,7 @@ class HotelApp(ctk.CTk):
         self.menu_frame.grid(row=1, column=0, sticky="nsw", padx=30, pady=(0, 30))
         self.menu_frame.grid_propagate(False)
 
-            # Agregar el botón de reporte al principio
+        # Agregar el botón de reporte al principio
         self.report_button = create_report_button(self.menu_frame, self)
         self.report_button.pack(side="top", pady=(15,5))
             
@@ -94,28 +125,31 @@ class HotelApp(ctk.CTk):
         self.create_menu_button("    Reservas", self.show_reservas)
 
     def create_menu_button(self, text, command):
-        btn = ctk.CTkButton(
+        button = ctk.CTkButton(
             self.menu_frame,
             text=text,
             command=command,
             font=("Arial", 20),
-            height=50,
-            width=240,
             corner_radius=0,
+            height=40,
+            width=200,
             fg_color="#25253a",
-            hover_color="#fa5c9c",
+            hover_color="#f72585",
             anchor="w",
-            text_color="white",
         )
-        btn.pack(side="top", fill="x", pady=15)
+        button.pack(pady=15)
 
     def create_main_frame(self):
         self.main_frame = ctk.CTkFrame(
             self, 
+            fg_color="#25253a", 
             corner_radius=15, 
-            fg_color="#25253a"
+            width=800, 
+            height=700
         )
-        self.main_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(10,30), pady=30)
+        self.main_frame.grid(row=1, column=1, sticky="nsew", padx=(0, 30), pady=(0, 30))
+        self.main_frame.grid_rowconfigure(0, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=1)
 
     def clear_main_frame(self):
         for widget in self.main_frame.winfo_children():
@@ -135,3 +169,12 @@ class HotelApp(ctk.CTk):
         self.clear_main_frame()
         reservas_vista = ReservasVista(self.main_frame, self.hotel_facade)
         reservas_vista.pack(fill="both", expand=True)
+    
+    def destroy(self):
+        """Limpiar recursos al cerrar"""
+        try:
+            if hasattr(self, 'db') and self.db:
+                self.db.close()
+        except:
+            pass
+        super().destroy()

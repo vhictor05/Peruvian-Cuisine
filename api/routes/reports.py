@@ -5,9 +5,6 @@ from datetime import datetime
 from database import get_db_connection, close_connection
 import time
 import functools
-import cProfile
-import pstats
-import io
 
 router = APIRouter(
     prefix="/api/v1/reports",
@@ -18,27 +15,15 @@ router = APIRouter(
 report_cache = {}
 CACHE_TTL = 60  # segundos
 
-# Función para medir el tiempo de ejecución
+# Función para medir el tiempo de ejecución (solo con time, sin cProfile)
 def measure_time(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
-        # Usar cProfile para un análisis detallado
-        pr = cProfile.Profile()
-        pr.enable()
-        
         start_time = time.time()
         result = await func(*args, **kwargs)
         end_time = time.time()
-        
-        pr.disable()
-        s = io.StringIO()
-        ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
-        ps.print_stats(10)  # Top 10 funciones que consumen más tiempo
-        
         execution_time = end_time - start_time
         print(f"Función {func.__name__} ejecutada en {execution_time:.4f} segundos")
-        print(s.getvalue())
-        
         return result
     return wrapper
 

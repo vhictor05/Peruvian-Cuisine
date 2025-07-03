@@ -2,11 +2,18 @@ import customtkinter as ctk
 from tkinter import messagebox
 from apps.disco.utils.ui_components import create_form_entry, create_treeview, create_button
 from apps.disco.utils.validadores import validar_rut, validar_telefono, validar_email
+import requests
+import threading
+
+API_URL = "http://localhost:8000/api/v1/disco/clientes"
 
 class ClientesVista:
-    def __init__(self, parent, facade):
+    def __init__(self, parent, facade=None):
         self.parent = parent
-        self.facade = facade
+        # self.facade = facade  # Ya no se usa
+        self.limit = 20
+        self.offset = 0
+        self.total_clientes = 0
         
     def show(self):
         self.setup_title()
@@ -171,15 +178,18 @@ class ClientesVista:
             "email": email,
             "telefono": telefono
         }
-        
-        try:
-            self.facade.registrar_cliente(cliente_data)
-            messagebox.showinfo("Éxito", "Cliente registrado correctamente")
-            self.actualizar_lista_clientes()
-            self.limpiar_campos()
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-            
+
+        def task():
+            try:
+                r = requests.post(API_URL, json=cliente_data)
+                if r.status_code == 201:
+                    self.parent.after(0, lambda: [messagebox.showinfo("Éxito", "Cliente registrado correctamente"), self.actualizar_lista_clientes(), self.limpiar_campos()])
+                else:
+                    self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudo registrar el cliente: {r.text}"))
+            except Exception as e:
+                self.parent.after(0, lambda: messagebox.showerror("Error", str(e)))
+        threading.Thread(target=task).start()
+
     def editar_cliente(self):
         selected_item = self.cliente_tree.selection()
         if not selected_item:
@@ -204,45 +214,74 @@ class ClientesVista:
             messagebox.showerror("Error", "El email ingresado no es válido.")
             return
 
-        try:
-            cliente_id = self.cliente_tree.item(selected_item[0], "values")[0]
-            nuevos_datos = {
-                "nombre": nombre,
-                "rut": rut,
-                "email": email,
-                "telefono": telefono
-            }
-            self.facade.actualizar_cliente(cliente_id, nuevos_datos)
-            messagebox.showinfo("Éxito", "Cliente editado correctamente")
-            self.actualizar_lista_clientes()
-            self.limpiar_campos()
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-            
+        cliente_id = self.cliente_tree.item(selected_item[0], "values")[0]
+        nuevos_datos = {
+            "nombre": nombre,
+            "rut": rut,
+            "email": email,
+            "telefono": telefono
+        }
+
+        def task():
+            try:
+                r = requests.put(f"{API_URL}/{cliente_id}", json=nuevos_datos)
+                if r.status_code == 200:
+                    self.parent.after(0, lambda: [messagebox.showinfo("Éxito", "Cliente editado correctamente"), self.actualizar_lista_clientes(), self.limpiar_campos()])
+                else:
+                    self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudo editar el cliente: {r.text}"))
+            except Exception as e:
+                self.parent.after(0, lambda: messagebox.showerror("Error", str(e)))
+        threading.Thread(target=task).start()
+
     def eliminar_cliente(self):
         selected_item = self.cliente_tree.selection()
         if not selected_item:
             messagebox.showwarning("Advertencia", "Seleccione un cliente para eliminar")
             return
-        
         cliente_id = self.cliente_tree.item(selected_item[0], "values")[0]
-        
         confirmacion = messagebox.askyesno(
             "Confirmar eliminación",
             "¿Está seguro que desea eliminar este cliente? Esta acción no se puede deshacer."
         )
-        
         if confirmacion:
+            def task():
+                try:
+                    r = requests.delete(f"{API_URL}/{cliente_id}")
+                    if r.status_code == 204:
+                        self.parent.after(0, lambda: [messagebox.showinfo("Éxito", "Cliente eliminado correctamente"), self.actualizar_lista_clientes(), self.limpiar_campos()])
+                    else:
+                        self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudo eliminar el cliente: {r.text}"))
+                except Exception as e:
+                    self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudo eliminar el cliente: {str(e)}"))
+            threading.Thread(target=task).start()
+
+    def actualizar_lista_clientes(self, limit=None, offset=None):
+        if limit is None:
+            limit = self.limit
+        if offset is None:
+            offset = self.offset
+        def task():
             try:
-                if self.facade.eliminar_cliente(cliente_id):
-                    messagebox.showinfo("Éxito", "Cliente eliminado correctamente")
-                    self.actualizar_lista_clientes()
-                    self.limpiar_campos()
+                r = requests.get(f"{API_URL}?limit={limit}&offset={offset}")
+                if r.status_code == 200:
+                    clientes = r.json()
+                    def insert_clientes():
+                        self.cliente_tree.delete(*self.cliente_tree.get_children())
+                        for cliente in clientes:
+                            self.cliente_tree.insert("", "end", values=(
+                                cliente['id'],
+                                cliente['nombre'],
+                                cliente['rut'],
+                                cliente['email'],
+                                cliente['telefono']
+                            ))
+                    self.parent.after(0, insert_clientes)
                 else:
-                    messagebox.showerror("Error", "No se pudo eliminar el cliente")
+                    self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudieron cargar los clientes: {r.text}"))
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo eliminar el cliente: {str(e)}")
-                
+                self.parent.after(0, lambda: messagebox.showerror("Error", f"No se pudieron cargar los clientes: {str(e)}"))
+        threading.Thread(target=task).start()
+
     def on_cliente_select(self, event):
         selected_items = self.cliente_tree.selection()
         if selected_items:
@@ -271,18 +310,6 @@ class ClientesVista:
 
             self.cliente_telefono.delete(0, "end")
             self.cliente_telefono.insert(0, values[4])
-            
-    def actualizar_lista_clientes(self):
-        for item in self.cliente_tree.get_children():
-            self.cliente_tree.delete(item)
-        for cliente in self.facade.listar_clientes():
-            self.cliente_tree.insert("", "end", values=(
-                cliente.id,
-                cliente.nombre,
-                cliente.rut,
-                cliente.email,
-                cliente.telefono
-            ))
             
     def limpiar_campos(self):
         self.cliente_nombre.delete(0, "end")

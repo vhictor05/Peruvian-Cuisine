@@ -1,8 +1,19 @@
-﻿from fastapi import FastAPI, Request
+﻿import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import multiprocessing
+import uvicorn
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from routes import reports
+from routes import disco  # <-- Importar el router de disco
+from routes import reports, hotel  # Agregar import de hotel
+from routes import reports, restaurant
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
+from estructura.crud.trago_crud import TragoCRUD
+from sqlalchemy.orm import sessionmaker
+from Database.DB import engine
 
 app = FastAPI(
     title="Peruvian Cuisine API",
@@ -12,7 +23,7 @@ app = FastAPI(
 
 # Middleware para medir tiempo de respuesta
 class TimingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
+    async def dispatch(self, request: Request, call_next):
         start_time = time.time()
         response = await call_next(request)
         process_time = time.time() - start_time
@@ -34,25 +45,48 @@ app.add_middleware(
 
 # Incluir las rutas
 app.include_router(reports.router)
+app.include_router(disco.router)  # <-- Incluir el router de disco
+app.include_router(hotel.router)  # Agregar rutas de hotel
+app.include_router(restaurant.router)
 
 # Ruta para verificar el estado del servicio
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "version": "1.0.1"}
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "modules": ["reports", "hotel"]  # Actualizar módulos disponibles
+    }
+
+@app.on_event("startup")
+def inicializar_tragos_startup():
+    pass
+
+# Ruta raíz
+@app.get("/")
+async def root():
+    return {
+        "message": "Peruvian Cuisine API", 
+        "version": "1.0.1",
+        "docs": "/docs"
+    }
 
 if __name__ == "__main__":
-    import uvicorn
-    import multiprocessing
+
     
     # Optimizar número de procesos a utilizar
     num_cores = multiprocessing.cpu_count()
-    print(f"Iniciando servidor con {num_cores} procesos")
+    workers = min(4, max(1, num_cores - 1))
+    print("Iniciando servidor en modo desarrollo...")
     
-    # Iniciar Uvicorn con múltiples procesos
+    print(f"🚀 Iniciando servidor con {workers} workers")
+    print(f"📡 API disponible en: http://localhost:8000")
+    print(f"📖 Documentación en: http://localhost:8000/docs")
+    
     uvicorn.run(
         "app:app", 
-        host="0.0.0.0", 
+        host="127.0.0.1",
         port=8000, 
-        workers=num_cores,
+        reload=True,
         log_level="info"
     )

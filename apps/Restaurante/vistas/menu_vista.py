@@ -1,14 +1,18 @@
+import requests
+import json
 import customtkinter as ctk
-from tkinter import ttk, messagebox
-from estructura.crud.menu_crud import MenuCRUD
-from estructura.crud.ingrediente_crud import IngredienteCRUD
-from estructura.models_folder.models_restaurente import Menu
+from tkinter import messagebox
+import tkinter.ttk as ttk
+
+# URL base de tu API
+API_BASE_URL = "http://127.0.0.1:8000/api/v1/restaurant"
 
 class MenuPanel(ctk.CTkFrame):
     def __init__(self, parent, db):
         super().__init__(parent)
-        self.db = db
+        self.db = db  # Solo para compatibilidad, no se usará
         self.configure(fg_color="#25253a", corner_radius=15)
+        self.selected_menu_id = None  # Para rastrear el menú seleccionado
 
         # Título
         self.label_title = ctk.CTkLabel(
@@ -227,7 +231,7 @@ class MenuPanel(ctk.CTkFrame):
         self.ingredientes_list.grid(row=2, column=0, columnspan=5, pady=10, sticky="nsew")
 
         # Lista de menús
-        self.menu_list = self.create_treeview(Menu)
+        self.menu_list = self.create_treeview_menu()
         self.menu_list.grid(row=4, column=0, pady=10, sticky="nsew")
 
         # Configuración del grid
@@ -238,8 +242,9 @@ class MenuPanel(ctk.CTkFrame):
         self.refresh_list()
         self.load_ingredientes()
 
-    def create_treeview(self, model_class):
-        columns = [column.name for column in model_class.__table__.columns if column.name not in ['id']] + ["ing_necesarios"]
+    def create_treeview_menu(self):
+        """Crear treeview para menús sin depender de SQLAlchemy"""
+        columns = ["Nombre", "Descripcion", "Precio", "Ing_necesarios"]
         treeview = ttk.Treeview(self, columns=columns, show="headings")
         for column in columns:
             treeview.heading(column, text=column.capitalize())
@@ -255,9 +260,11 @@ class MenuPanel(ctk.CTkFrame):
         return treeview
 
     def load_ingredientes(self):
-        ingredientes = IngredienteCRUD.get_ingredientes(self.db)
-        ingrediente_names = [ingrediente.nombre for ingrediente in ingredientes]
-        self.ingredientes_combobox.configure(values=ingrediente_names)
+        """Cargar ingredientes de ejemplo - ya no usar SQLAlchemy"""
+        # Ingredientes de ejemplo (podrías crear otro endpoint de API para esto)
+        ingredientes_ejemplo = ["Tomate", "Cebolla", "Ají", "Pescado", "Limón", "Cilantro", 
+                              "Papas", "Carne", "Pollo", "Arroz", "Frijoles"]
+        self.ingredientes_combobox.configure(values=ingredientes_ejemplo)
         self.ingredientes_combobox.set("Por favor selecciona un ingrediente")
 
     def add_ingrediente(self):
@@ -328,19 +335,11 @@ class MenuPanel(ctk.CTkFrame):
         
         self.ingredientes_list.delete(selected_item)
 
-    def get_ingredientes_from_list(self):
-        ingredientes = []
-        for item in self.ingredientes_list.get_children():
-            ingrediente, cantidad = self.ingredientes_list.item(item, "values")
-            ingrediente_obj = IngredienteCRUD.get_ingrediente_by_nombre(self.db, ingrediente)
-            if ingrediente_obj:
-                ingredientes.append({"id": ingrediente_obj.id, "cantidad": float(cantidad)})
-        return ingredientes
-
     def add_menu(self):
-        nombre = self.nombre_entry.get()
-        descripcion = self.descripcion_entry.get()
-        precio = self.precio_entry.get()
+        """Crear menú usando SOLO la API"""
+        nombre = self.nombre_entry.get().strip()
+        descripcion = self.descripcion_entry.get().strip()
+        precio = self.precio_entry.get().strip()
 
         if not nombre or not descripcion or not precio:
             messagebox.showerror("Error", "Todos los campos son obligatorios.")
@@ -355,129 +354,169 @@ class MenuPanel(ctk.CTkFrame):
             messagebox.showerror("Error", "El precio debe ser un número.")
             return
 
-        menu_existente = MenuCRUD.get_menu_by_nombre(self.db, nombre)
-        if menu_existente:
-            messagebox.showerror("Error", f"El menú '{nombre}' ya existe.")
-            return
+        # Recopilar ingredientes de la lista
+        ingredientes = {}
+        for item in self.ingredientes_list.get_children():
+            ingrediente, cantidad = self.ingredientes_list.item(item, "values")
+            ingredientes[ingrediente] = float(cantidad)
 
-        ingredientes = self.get_ingredientes_from_list()
-        if not ingredientes:
-            messagebox.showerror("Error", "Debe agregar al menos un ingrediente al menú.")
-            return
-
-        menu = MenuCRUD.create_menu(self.db, nombre, descripcion, precio, ingredientes)
-        if menu:
-            messagebox.showinfo("Éxito", f"Menú '{nombre}' registrado con éxito.")
-            self.refresh_list()
-            # Limpiar campos
-            self.nombre_entry.delete(0, "end")
-            self.descripcion_entry.delete(0, "end")
-            self.precio_entry.delete(0, "end")
-            for item in self.ingredientes_list.get_children():
-                self.ingredientes_list.delete(item)
-        else:
-            messagebox.showerror("Error", f"Error al registrar el menú '{nombre}'.")
+        # Llamar a la API
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/menu",
+                json={
+                    "nombre": nombre,
+                    "descripcion": descripcion,
+                    "precio": precio,
+                    "ingredientes": ingredientes
+                },
+                headers={"Content-Type": "application/json"
+            })
+            
+            if response.status_code == 201:
+                messagebox.showinfo("Éxito", "Menú creado correctamente")
+                self.refresh_list()
+                # Limpiar campos
+                self.nombre_entry.delete(0, "end")
+                self.descripcion_entry.delete(0, "end")
+                self.precio_entry.delete(0, "end")
+                for item in self.ingredientes_list.get_children():
+                    self.ingredientes_list.delete(item)
+            else:
+                error_detail = response.json().get("detail", "Error desconocido")
+                messagebox.showerror("Error", f"Error al crear menú: {error_detail}")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Error de conexión: {str(e)}")
 
     def open_edit_window(self):
+        """Abrir ventana de edición usando datos de la tabla"""
         selected_item = self.menu_list.selection()
         if not selected_item:
             messagebox.showerror("Error", "Selecciona un menú de la lista.")
             return
 
-        menu_nombre = self.menu_list.item(selected_item)["values"][0]
-        menu = MenuCRUD.get_menu_by_nombre(self.db, menu_nombre)
+        # Obtener datos del menú seleccionado
+        item_tags = self.menu_list.item(selected_item[0])["tags"]
+        if not item_tags:
+            messagebox.showerror("Error", "No se pudo obtener el ID del menú.")
+            return
+        
+        menu_id = item_tags[0]
+        item_values = self.menu_list.item(selected_item[0])["values"]
+        
+        # Crear ventana de edición
+        self.edit_window = ctk.CTkToplevel(self)
+        self.edit_window.title("Editar Menú")
+        self.edit_window.geometry("600x500")
+        self.edit_window.configure(fg_color="#1c1c1c")
+        
+        # Campos de edición con valores actuales
+        self.edit_nombre_entry = self.create_form_entry_in_window("Nombre", 1, item_values[0])
+        self.edit_descripcion_entry = self.create_form_entry_in_window("Descripción", 2, item_values[1])
+        self.edit_precio_entry = self.create_form_entry_in_window("Precio", 3, item_values[2])
 
-        if menu:
-            self.edit_window = ctk.CTkToplevel(self)
-            self.edit_window.title("Editar Menú")
-            self.edit_window.geometry("400x400")
-            self.edit_window.configure(fg_color="#1c1c1c")
-            
-            self.edit_nombre_entry = self.create_form_entry_in_window("Nombre", 1, menu.nombre)
-            self.edit_descripcion_entry = self.create_form_entry_in_window("Descripción", 2, menu.descripcion)
-            self.edit_precio_entry = self.create_form_entry_in_window("Precio", 3, str(menu.precio))
+        # Frame de ingredientes
+        self.edit_ingredientes_frame = ctk.CTkFrame(
+            self.edit_window, 
+            fg_color="#2c2c2c", 
+            corner_radius=10
+        )
+        self.edit_ingredientes_frame.grid(row=4, column=0, pady=10, padx=10, sticky="ew")
 
-            self.edit_ingredientes_frame = ctk.CTkFrame(
-                self.edit_window, 
-                fg_color="#2c2c2c", 
-                corner_radius=10
-            )
-            self.edit_ingredientes_frame.grid(row=4, column=0, pady=10, padx=10, sticky="ew")
+        # Controles de ingredientes
+        self.edit_ingredientes_label = ctk.CTkLabel(
+            self.edit_ingredientes_frame, 
+            text="Ingredientes:", 
+            font=("Arial", 14)
+        )
+        self.edit_ingredientes_label.grid(row=0, column=0, padx=10, pady=5)
 
-            self.edit_ingredientes_label = ctk.CTkLabel(
-                self.edit_ingredientes_frame, 
-                text="Ingredientes:", 
-                font=("Arial", 14)
-            )
-            self.edit_ingredientes_label.grid(row=0, column=0, padx=10, pady=5)
+        self.edit_ingredientes_combobox = ctk.CTkComboBox(
+            self.edit_ingredientes_frame, 
+            values=["Tomate", "Cebolla", "Ají", "Pescado", "Limón", "Cilantro", 
+                   "Papas", "Carne", "Pollo", "Arroz", "Frijoles"],
+            height=30,
+            width=200, 
+            corner_radius=5
+        )
+        self.edit_ingredientes_combobox.grid(row=1, column=0, padx=10, pady=5)
 
-            self.edit_ingredientes_combobox = ctk.CTkComboBox(
-                self.edit_ingredientes_frame, 
-                values=[],
-                height=30,
-                width=200, 
-                corner_radius=5
-            )
-            self.edit_ingredientes_combobox.grid(row=1, column=0, padx=10, pady=5)
+        self.edit_cantidad_entry = ctk.CTkEntry(
+            self.edit_ingredientes_frame, 
+            corner_radius=5,
+            height=30,
+            width=100
+        )
+        self.edit_cantidad_entry.grid(row=1, column=1, padx=10, pady=5)
 
-            self.edit_cantidad_entry = ctk.CTkEntry(
-                self.edit_ingredientes_frame, 
-                corner_radius=5,
-                height=30,
-                width=100
-            )
-            self.edit_cantidad_entry.grid(row=1, column=1, padx=10, pady=5)
+        # Botones para gestionar ingredientes
+        self.edit_add_ingrediente_button = ctk.CTkButton(
+            self.edit_ingredientes_frame, 
+            text="Añadir", 
+            command=self.edit_add_ingrediente, 
+            corner_radius=15,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
+        self.edit_add_ingrediente_button.grid(row=1, column=2, padx=5, pady=5)
 
-            # Botones para gestionar ingredientes
-            self.edit_add_ingrediente_button = ctk.CTkButton(
-                self.edit_ingredientes_frame, 
-                text="Añadir Ingrediente", 
-                command=self.edit_add_ingrediente, 
-                corner_radius=15,
-                fg_color="#4361ee",
-                hover_color="#5a75f0"
-            )
-            self.edit_add_ingrediente_button.grid(row=1, column=2, padx=10, pady=5)
+        self.edit_update_ingrediente_button = ctk.CTkButton(
+            self.edit_ingredientes_frame, 
+            text="Actualizar", 
+            command=self.edit_update_ingrediente, 
+            corner_radius=15,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
+        self.edit_update_ingrediente_button.grid(row=1, column=3, padx=5, pady=5)
 
-            self.edit_update_ingrediente_button = ctk.CTkButton(
-                self.edit_ingredientes_frame, 
-                text="Actualizar Ingrediente", 
-                command=self.edit_update_ingrediente, 
-                corner_radius=15,
-                fg_color="#4361ee",
-                hover_color="#5a75f0"
-            )
-            self.edit_update_ingrediente_button.grid(row=1, column=3, padx=10, pady=5)
+        self.edit_delete_ingrediente_button = ctk.CTkButton(
+            self.edit_ingredientes_frame, 
+            text="Eliminar", 
+            command=self.edit_delete_ingrediente, 
+            corner_radius=15,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
+        self.edit_delete_ingrediente_button.grid(row=1, column=4, padx=5, pady=5)
 
-            self.edit_delete_ingrediente_button = ctk.CTkButton(
-                self.edit_ingredientes_frame, 
-                text="Eliminar Ingrediente", 
-                command=self.edit_delete_ingrediente, 
-                corner_radius=15,
-                fg_color="#4361ee",
-                hover_color="#5a75f0"
-            )
-            self.edit_delete_ingrediente_button.grid(row=1, column=4, padx=10, pady=5)
+        # Lista de ingredientes en la ventana de edición
+        self.edit_ingredientes_list = self.create_treeview_ingredientes_for_edit()
+        self.edit_ingredientes_list.grid(row=2, column=0, columnspan=5, pady=10, sticky="nsew")
 
-            self.edit_ingredientes_list = self.create_treeview_ingredientes()
-            self.edit_ingredientes_list.grid(row=2, column=0, columnspan=5, pady=10, sticky="nsew")
+        # Parsear y cargar ingredientes actuales
+        ingredientes_str = item_values[3] if len(item_values) > 3 else ""
+        if ingredientes_str:
+            # Formato esperado: "1.0x Tomate, 0.5x Cebolla"
+            for ingrediente_info in ingredientes_str.split(", "):
+                if "x " in ingrediente_info:
+                    cantidad_str, nombre = ingrediente_info.split("x ", 1)
+                    try:
+                        cantidad = float(cantidad_str)
+                        self.edit_ingredientes_list.insert("", "end", values=(nombre, cantidad))
+                    except:
+                        pass
 
-            # Cargar ingredientes existentes
-            for ingrediente in menu.ingredientes:
-                self.edit_ingredientes_list.insert("", "end", 
-                    values=(ingrediente.ingrediente.nombre, ingrediente.cantidad))
+        # Botón guardar
+        self.save_button = ctk.CTkButton(
+            self.edit_window, 
+            text="Guardar Cambios", 
+            command=lambda: self.update_menu(menu_id), 
+            corner_radius=50,
+            fg_color="#4361ee",
+            hover_color="#5a75f0"
+        )
+        self.save_button.grid(row=5, column=0, pady=10)
 
-            self.save_button = ctk.CTkButton(
-                self.edit_window, 
-                text="Guardar Cambios", 
-                command=lambda: self.update_menu(menu.id), 
-                corner_radius=50,
-                fg_color="#4361ee",
-                hover_color="#5a75f0"
-            )
-            self.save_button.grid(row=5, column=0, pady=10)
-
-            self.load_ingredientes()
+    def create_treeview_ingredientes_for_edit(self):
+        """Crear treeview específico para la ventana de edición"""
+        columns = ["Ingrediente", "Cantidad"]
+        treeview = ttk.Treeview(self.edit_ingredientes_frame, columns=columns, show="headings", height=6)
+        for column in columns:
+            treeview.heading(column, text=column)
+            treeview.column(column, width=150)
+        return treeview
 
     def create_form_entry_in_window(self, label_text, row, value):
         frame = ctk.CTkFrame(self.edit_window, fg_color="#25253a", corner_radius=15)
@@ -567,19 +606,11 @@ class MenuPanel(ctk.CTkFrame):
 
         self.edit_ingredientes_list.delete(selected_item)
 
-    def get_ingredientes_from_edit_list(self):
-        ingredientes = []
-        for item in self.edit_ingredientes_list.get_children():
-            ingrediente, cantidad = self.edit_ingredientes_list.item(item, "values")
-            ingrediente_obj = IngredienteCRUD.get_ingrediente_by_nombre(self.db, ingrediente)
-            if ingrediente_obj:
-                ingredientes.append({"id": ingrediente_obj.id, "cantidad": float(cantidad)})
-        return ingredientes
-
     def update_menu(self, menu_id):
-        nombre = self.edit_nombre_entry.get()
-        descripcion = self.edit_descripcion_entry.get()
-        precio = self.edit_precio_entry.get()
+        """Actualizar menú usando SOLO la API"""
+        nombre = self.edit_nombre_entry.get().strip()
+        descripcion = self.edit_descripcion_entry.get().strip()
+        precio = self.edit_precio_entry.get().strip()
 
         if not nombre or not descripcion or not precio:
             messagebox.showerror("Error", "Todos los campos son obligatorios.")
@@ -594,47 +625,94 @@ class MenuPanel(ctk.CTkFrame):
             messagebox.showerror("Error", "El precio debe ser un número.")
             return
 
-        ingredientes = self.get_ingredientes_from_edit_list()
-        if not ingredientes:
-            messagebox.showerror("Error", "Debe agregar al menos un ingrediente al menú.")
-            return
+        # Recopilar ingredientes de la lista de edición
+        ingredientes = {}
+        for item in self.edit_ingredientes_list.get_children():
+            ingrediente, cantidad = self.edit_ingredientes_list.item(item, "values")
+            ingredientes[ingrediente] = float(cantidad)
 
-        menu = MenuCRUD.update_menu(self.db, menu_id, nombre, descripcion, precio, ingredientes)
-        if menu:
-            messagebox.showinfo("Éxito", f"Menú '{nombre}' actualizado con éxito.")
-            self.edit_window.destroy()
-            self.refresh_list()
-        else:
-            messagebox.showerror("Error", f"Error al actualizar el menú '{nombre}'.")
+        try:
+            response = requests.put(
+                f"{API_BASE_URL}/menu/{menu_id}",
+                json={
+                    "nombre": nombre,
+                    "descripcion": descripcion,
+                    "precio": precio,
+                    "ingredientes": ingredientes
+                },
+                headers={"Content-Type": "application/json"
+            })
+            
+            if response.status_code == 200:
+                messagebox.showinfo("Éxito", f"Menú '{nombre}' actualizado con éxito.")
+                self.edit_window.destroy()
+                self.refresh_list()
+            else:
+                error_detail = response.json().get("detail", "Error desconocido")
+                messagebox.showerror("Error", f"Error al actualizar menú: {error_detail}")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Error de conexión: {str(e)}")
 
     def delete_menu(self):
+        """Eliminar menú usando SOLO la API"""
         selected_item = self.menu_list.selection()
         if not selected_item:
             messagebox.showerror("Error", "Selecciona un menú de la lista.")
             return
 
-        menu_nombre = self.menu_list.item(selected_item)["values"][0]
+        # Obtener el ID del menú desde las tags
+        item_tags = self.menu_list.item(selected_item[0])["tags"]
+        if not item_tags:
+            messagebox.showerror("Error", "No se pudo obtener el ID del menú.")
+            return
+        
+        menu_id = item_tags[0]
+        menu_nombre = self.menu_list.item(selected_item[0])["values"][0]
+        
         confirm = messagebox.askyesno("Confirmar Eliminación", 
                                     f"¿Estás seguro de eliminar el menú '{menu_nombre}'?")
         if confirm:
-            menu = MenuCRUD.get_menu_by_nombre(self.db, menu_nombre)
-            if menu:
-                MenuCRUD.delete_menu(self.db, menu.id)
-                messagebox.showinfo("Éxito", f"Menú '{menu_nombre}' eliminado con éxito.")
-                self.refresh_list()
-            else:
-                messagebox.showerror("Error", f"No se pudo encontrar el menú '{menu_nombre}'.")
+            try:
+                response = requests.delete(f"{API_BASE_URL}/menu/{menu_id}")
+                
+                if response.status_code == 204:
+                    messagebox.showinfo("Éxito", f"Menú '{menu_nombre}' eliminado con éxito.")
+                    self.refresh_list()
+                else:
+                    error_detail = response.json().get("detail", "Error desconocido")
+                    messagebox.showerror("Error", f"Error al eliminar menú: {error_detail}")
+                    
+            except Exception as e:
+                messagebox.showerror("Error", f"Error de conexión: {str(e)}")
 
     def refresh_list(self):
-        for item in self.menu_list.get_children():
-            self.menu_list.delete(item)
-        menus = MenuCRUD.get_menus(self.db)
-        for menu in menus:
-            ing_necesarios = ", ".join([f"{ing.cantidad}x {ing.ingrediente.nombre}" 
-                                      for ing in menu.ingredientes])
-            self.menu_list.insert("", "end", values=(
-                menu.nombre,
-                menu.descripcion,
-                menu.precio,
-                ing_necesarios
-            ))            
+        """Cargar menús desde la API"""
+        try:
+            # Limpiar lista actual
+            for item in self.menu_list.get_children():
+                self.menu_list.delete(item)
+            
+            # Obtener menús desde la API
+            response = requests.get(f"{API_BASE_URL}/menu")
+            
+            if response.status_code == 200:
+                menus = response.json()
+                for menu in menus:
+                    # Formatear ingredientes para mostrar
+                    ingredientes_str = ", ".join([f"{cantidad}x {nombre}" 
+                                                for nombre, cantidad in menu.get("ingredientes", {}).items()])
+                    
+                    # Insertar en la lista con el ID como tag
+                    item = self.menu_list.insert("", "end", values=(
+                        menu.get("nombre", ""),
+                        menu.get("descripcion", ""),
+                        menu.get("precio", ""),
+                        ingredientes_str
+                    ), tags=(menu.get("id"),))
+            else:
+                print(f"Error al cargar menús: {response.status_code}")
+                
+        except Exception as e:
+            print(f"Error de conexión: {e}")
+            messagebox.showerror("Error", "No se pudieron cargar los menús desde la API")

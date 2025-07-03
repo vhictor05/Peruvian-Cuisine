@@ -3,11 +3,15 @@ from tkinter import messagebox, ttk
 from apps.disco.utils.ui_components import create_treeview
 from estructura.builder.pedido_builder import PedidoBuilder
 from fpdf import FPDF
+import requests
+import threading
+
+API_TRAGOS_URL = "http://localhost:8000/api/v1/disco/tragos"
 
 class PedidosTragosVista:
-    def __init__(self, parent, facade):
+    def __init__(self, parent, facade=None):
         self.parent = parent
-        self.facade = facade
+        # self.facade = facade  # Ya no se usa
         
     def show(self):
         self.setup_cliente_frame()
@@ -185,19 +189,19 @@ class PedidosTragosVista:
             
             # Extraer nombre del trago
             trago_nombre = trago_str.split(" ($")[0]
-            trago = self.facade.obtener_trago_por_nombre(trago_nombre)
-            
-            if not trago:
+            # Obtener trago desde la API
+            response = requests.get(f"{API_TRAGOS_URL}?nombre={trago_nombre}")
+            if response.status_code == 200 and response.json():
+                trago = response.json()[0]  # Suponiendo que la API devuelve una lista
+            else:
                 messagebox.showerror("Error", "Trago no encontrado")
                 return
-            
-            subtotal = trago.precio * cantidad
-            
+            subtotal = trago['precio'] * cantidad
             # Insertar con botón de eliminar
             item_id = self.pedido_tree.insert("", "end", values=(
-                trago.nombre,
+                trago['nombre'],
                 cantidad,
-                f"${trago.precio:.2f}",
+                f"${trago['precio']:.2f}",
                 f"${subtotal:.2f}",
                 "✖"
             ))
@@ -206,8 +210,8 @@ class PedidosTragosVista:
             self.trago_cantidad.delete(0, "end")
             self.trago_cantidad.insert(0, "1")
             
-        except ValueError:
-            messagebox.showerror("Error", "Cantidad debe ser un número entero")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo agregar el trago: {str(e)}")
 
     def eliminar_trago_seleccionado_pedido(self):
         selected = self.pedido_tree.selection()
@@ -251,87 +255,55 @@ class PedidosTragosVista:
 
         try:
             cliente_rut = cliente_str.split("(")[-1].rstrip(")")
-            cliente = self.facade.obtener_cliente_por_rut(cliente_rut)
-
-            if not cliente:
+            # Obtener cliente desde la API
+            r = requests.get(f"http://localhost:8000/api/v1/disco/clientes?rut={cliente_rut}")
+            if r.status_code == 200 and r.json():
+                cliente = r.json()[0]
+            else:
                 messagebox.showerror("Error", "Cliente no encontrado")
                 return
 
-            builder = PedidoBuilder().set_cliente(cliente.id)
+            builder = PedidoBuilder().set_cliente(cliente['id'])
+            detalles_list = []
 
             for item in items:
                 values = self.pedido_tree.item(item, "values")
                 trago_nombre = values[0]
                 cantidad = int(values[1])
-
-                trago = self.facade.obtener_trago_por_nombre(trago_nombre)
-                builder.add_detalle(trago.id, cantidad, trago.precio)
+                # Obtener trago desde la API
+                resp = requests.get(f"http://localhost:8000/api/v1/disco/tragos?nombre={trago_nombre}")
+                if resp.status_code == 200 and resp.json():
+                    trago = resp.json()[0]
+                else:
+                    messagebox.showerror("Error", f"Trago '{trago_nombre}' no encontrado")
+                    return
+                builder.add_detalle(trago['id'], cantidad, trago['precio'])
+                detalles_list.append({
+                    "trago_id": trago['id'],
+                    "cantidad": cantidad,
+                    "precio_unitario": trago['precio']
+                })
 
             pedido_data = builder.build()
 
-            pedido = self.facade.crear_pedido(
-                pedido_data["cliente_id"],
-                pedido_data["total"],
-                pedido_data["detalles"]
-            )
-
-            self.generar_boleta_tragos(pedido.id)
-            messagebox.showinfo("Éxito", f"Pedido #{pedido.id} registrado\nBoleta generada: boleta_pedido_{pedido.id}.pdf")
-            self.limpiar_pedido()
+            payload = {
+                "cliente_id": pedido_data["cliente_id"],
+                "total": pedido_data["total"],
+                "detalles": detalles_list
+            }
+            resp = requests.post("http://localhost:8000/api/v1/disco/pedidos", json=payload)
+            if resp.status_code == 201:
+                messagebox.showinfo("Éxito", f"Pedido registrado correctamente")
+                self.limpiar_pedido()
+            else:
+                messagebox.showerror("Error", f"No se pudo registrar el pedido: {resp.text}")
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo completar el pedido: {str(e)}")
 
     def generar_boleta_tragos(self, pedido_id):
-        pedido = self.facade.obtener_pedido_por_id(pedido_id)
-        cliente = self.facade.obtener_cliente_por_id(pedido.cliente_id)
-        
-        pdf = FPDF()
-        pdf.add_page()
-        
-        # Encabezado
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(0, 10, "Boleta de Pedido - Discoteca", 0, 1, "C")
-        pdf.ln(10)
-        
-        # Información del cliente
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 10, f"Cliente: {cliente.nombre}", 0, 1)
-        pdf.cell(0, 10, f"RUT: {cliente.rut}", 0, 1)
-        pdf.cell(0, 10, f"Fecha: {pedido.fecha.strftime('%Y-%m-%d %H:%M')}", 0, 1)
-        pdf.ln(10)
-        
-        # Detalles del pedido
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(40, 10, "Trago", 1)
-        pdf.cell(30, 10, "Cantidad", 1)
-        pdf.cell(40, 10, "Precio Unitario", 1)
-        pdf.cell(40, 10, "Subtotal", 1)
-        pdf.ln()
-        
-        pdf.set_font("Arial", "", 12)
-        for trago_id, cantidad in pedido.detalles.items():
-            trago = self.facade.obtener_trago_por_id(trago_id)
-            subtotal = trago.precio * cantidad
-            
-            pdf.cell(40, 10, trago.nombre, 1)
-            pdf.cell(30, 10, str(cantidad), 1)
-            pdf.cell(40, 10, f"${trago.precio:.2f}", 1)
-            pdf.cell(40, 10, f"${subtotal:.2f}", 1)
-            pdf.ln()
-        
-        # Total
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(0, 10, f"Total: ${pedido.total:.2f}", 0, 1, "R")
-        pdf.ln(10)
-        
-        # Pie de página
-        pdf.set_font("Arial", "I", 10)
-        pdf.cell(0, 10, "¡Gracias por su compra!", 0, 1, "C")
-        
-        # Guardar PDF
-        nombre_archivo = f"boleta_pedido_{pedido_id}.pdf"
-        pdf.output(nombre_archivo)
+        # Aquí deberías obtener el pedido y cliente desde la API si existe endpoint
+        messagebox.showinfo("Info", "Generación de boleta pendiente de integración con la API de pedidos.")
 
     def limpiar_pedido(self):
         # Limpiar Treeview
@@ -352,41 +324,82 @@ class PedidosTragosVista:
         )
 
     def actualizar_lista_clientes_combo(self):
-        clientes = self.facade.listar_clientes()
-        valores = [f"{c.nombre} ({c.rut})" for c in clientes]
-        self.lista_clientes.configure(values=valores)
+        def task():
+            try:
+                r = requests.get("http://localhost:8000/api/v1/disco/clientes?limit=1000&offset=0")
+                if r.status_code == 200:
+                    clientes = r.json()
+                    valores = [f"{c['nombre']} ({c['rut']})" for c in clientes]
+                    self.parent.after(0, lambda: self.lista_clientes.configure(values=valores))
+                else:
+                    self.parent.after(0, lambda: self.lista_clientes.configure(values=[]))
+            except Exception:
+                self.parent.after(0, lambda: self.lista_clientes.configure(values=[]))
+        threading.Thread(target=task).start()
 
     def filtrar_clientes(self, event):
-        busqueda = self.busqueda_cliente.get().lower()
-        clientes = self.facade.listar_clientes()
-        
-        if busqueda:
-            filtrados = [f"{c.nombre} ({c.rut})" for c in clientes 
-                        if busqueda in c.nombre.lower() or busqueda in c.rut]
-        else:
-            filtrados = [f"{c.nombre} ({c.rut})" for c in clientes]
-        
-        self.lista_clientes.configure(values=filtrados)
-        self.lista_clientes.set("")
+        def task():
+            busqueda = self.busqueda_cliente.get().lower()
+            try:
+                r = requests.get("http://localhost:8000/api/v1/disco/clientes?limit=1000&offset=0")
+                if r.status_code == 200:
+                    clientes = r.json()
+                    if busqueda:
+                        filtrados = [f"{c['nombre']} ({c['rut']})" for c in clientes if busqueda in c['nombre'].lower() or busqueda in c['rut']]
+                    else:
+                        filtrados = [f"{c['nombre']} ({c['rut']})" for c in clientes]
+                    self.parent.after(0, lambda: [self.lista_clientes.configure(values=filtrados), self.lista_clientes.set("")])
+                else:
+                    self.parent.after(0, lambda: [self.lista_clientes.configure(values=[]), self.lista_clientes.set("")])
+            except Exception:
+                self.parent.after(0, lambda: [self.lista_clientes.configure(values=[]), self.lista_clientes.set("")])
+        threading.Thread(target=task).start()
 
     def actualizar_lista_tragos_combo(self):
-        tragos = self.facade.listar_tragos()
-        valores = [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
-        self.lista_tragos.configure(values=valores)
+        def task():
+            try:
+                r = requests.get(f"{API_TRAGOS_URL}?limit=1000&offset=0")
+                if r.status_code == 200:
+                    tragos = r.json()
+                    valores = [f"{t['nombre']} (${t['precio']:.2f})" for t in tragos]
+                    self.parent.after(0, lambda: self.lista_tragos.configure(values=valores))
+                else:
+                    self.parent.after(0, lambda: self.lista_tragos.configure(values=[]))
+            except Exception:
+                self.parent.after(0, lambda: self.lista_tragos.configure(values=[]))
+        threading.Thread(target=task).start()
 
     def filtrar_tragos(self, event):
-        busqueda = self.busqueda_trago.get().lower()
-        tragos = self.facade.listar_tragos()
-        
-        if busqueda:
-            filtrados = [f"{t.nombre} (${t.precio:.2f})" for t in tragos 
-                        if busqueda in t.nombre.lower() or 
-                        busqueda in (t.categoria.lower() if t.categoria else "")]
-        else:
-            filtrados = [f"{t.nombre} (${t.precio:.2f})" for t in tragos]
-        
-        self.lista_tragos.configure(values=filtrados)
-        self.lista_tragos.set("")
+        def task():
+            busqueda = self.busqueda_trago.get().lower()
+            try:
+                r = requests.get(f"{API_TRAGOS_URL}?limit=1000&offset=0")
+                if r.status_code == 200:
+                    tragos = r.json()
+                    if busqueda:
+                        filtrados = [f"{t['nombre']} (${t['precio']:.2f})" for t in tragos if busqueda in t['nombre'].lower() or (t.get('categoria','').lower() if t.get('categoria') else "")]
+                    else:
+                        filtrados = [f"{t['nombre']} (${t['precio']:.2f})" for t in tragos]
+                    self.parent.after(0, lambda: [self.lista_tragos.configure(values=filtrados), self.lista_tragos.set("")])
+                else:
+                    self.parent.after(0, lambda: [self.lista_tragos.configure(values=[]), self.lista_tragos.set("")])
+            except Exception:
+                self.parent.after(0, lambda: [self.lista_tragos.configure(values=[]), self.lista_tragos.set("")])
+        threading.Thread(target=task).start()
+
+    def obtener_trago_por_nombre(self, nombre, callback):
+        def task():
+            try:
+                r = requests.get(f"{API_TRAGOS_URL}?limit=1000&offset=0")
+                if r.status_code == 200:
+                    tragos = r.json()
+                    trago = next((t for t in tragos if t['nombre'] == nombre), None)
+                    self.parent.after(0, lambda: callback(trago))
+                else:
+                    self.parent.after(0, lambda: callback(None))
+            except Exception:
+                self.parent.after(0, lambda: callback(None))
+        threading.Thread(target=task).start()
 
     def on_cliente_seleccionado(self, event=None):
         cliente_str = self.lista_clientes.get()
