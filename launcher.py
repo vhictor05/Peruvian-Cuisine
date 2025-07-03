@@ -2,6 +2,8 @@ import subprocess
 import sys
 import atexit
 import os
+import time
+import webbrowser
 
 # Lista para mantener los procesos hijos
 child_processes = []
@@ -58,6 +60,16 @@ if __name__ == "__main__":
     # Iniciar los procesos
     process_gui = start_process(command_gui)
     process_api = start_process(command_api)
+
+    # Esperar 2 segundos y abrir el navegador
+    if process_api:
+        print("Esperando 2 segundos antes de abrir el navegador para la documentación de la API...")
+        time.sleep(2)
+        try:
+            webbrowser.open("http://127.0.0.1:8000/docs")
+            print("Navegador abierto en http://127.0.0.1:8000/docs")
+        except Exception as e:
+            print(f"No se pudo abrir el navegador: {e}")
 
     print("Ambos procesos han sido iniciados.")
     print("El lanzador permanecerá activo. Cierra esta ventana o presiona Ctrl+C para terminar todos los procesos.")
