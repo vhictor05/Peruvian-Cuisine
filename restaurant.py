@@ -14,7 +14,7 @@ class MainApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Restaurante")
-        self.geometry("1100x650")
+        self.geometry("1100x850")
         self.db = next(get_db())
         # Corregido: Pasando self.db al ObserverManager
         self.observer_manager = ObserverManager(self.db)

@@ -1,3 +1,12 @@
+import sys
+from pathlib import Path
+
+# Agregar el directorio padre al path para encontrar 'Database'
+current_dir = Path(__file__).parent
+project_dir = current_dir.parent
+sys.path.append(str(project_dir))
+
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
